@@ -497,6 +497,74 @@ export class PlanningService {
   }
 
   /**
+   * Fecha um planejamento (EM_EXECUCAO → CONCLUIDO)
+   */
+  async close(id: string, user: JwtPayload) {
+    const planning = await this.prisma.planning.findUnique({
+      where: { id },
+      include: {
+        classroom: true,
+      },
+    });
+
+    if (!planning) {
+      throw new NotFoundException('Planejamento não encontrado');
+    }
+
+    // Validar acesso
+    await this.validateAccess(planning, user);
+
+    // Validar RBAC: Professor não pode fechar
+    if (user.roles.some((role) => role.level === RoleLevel.PROFESSOR)) {
+      throw new ForbiddenException('Professores não podem fechar planejamentos');
+    }
+
+    // Validar status: somente EM_EXECUCAO pode ser fechado
+    if (planning.status !== PlanningStatus.EM_EXECUCAO) {
+      throw new BadRequestException(
+        'Somente planejamentos em execução podem ser fechados',
+      );
+    }
+
+    const updatedPlanning = await this.prisma.planning.update({
+      where: { id },
+      data: {
+        status: PlanningStatus.CONCLUIDO,
+      },
+      include: {
+        template: true,
+        classroom: true,
+        createdByUser: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    // Registrar auditoria
+    await this.auditService.log({
+      action: 'CLOSE' as any,
+      entity: 'PLANNING' as any,
+      entityId: id,
+      userId: user.sub,
+      mantenedoraId: planning.mantenedoraId,
+      unitId: planning.unitId,
+      changes: {
+        statusChange: {
+          from: planning.status,
+          to: PlanningStatus.CONCLUIDO,
+        },
+      },
+    });
+
+    return updatedPlanning;
+  }
+
+  /**
    * Valida se o usuário tem permissão para criar planejamentos
    */
   private async validateCreatePermission(

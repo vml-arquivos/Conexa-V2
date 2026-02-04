@@ -130,4 +130,21 @@ export class PlanningController {
   ) {
     return this.planningService.changeStatus(id, changeStatusDto, user);
   }
+
+  /**
+   * PATCH /plannings/:id/close
+   * Fecha um planejamento (EM_EXECUCAO → CONCLUIDO)
+   *
+   * Acesso:
+   * - DEVELOPER
+   * - MANTENEDORA
+   * - STAFF_CENTRAL
+   * - Professor: NÃO pode fechar
+   *
+   * Regra: Somente plannings com status EM_EXECUCAO podem ser fechados
+   */
+  @Patch(':id/close')
+  close(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.planningService.close(id, user);
+  }
 }
