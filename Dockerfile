@@ -1,30 +1,29 @@
 # syntax=docker/dockerfile:1
 
 # =========================
-# Builder: instala deps (inclui dev), gera prisma, builda Nest
+# Builder: deps com dev (para nest), build Nest, prisma generate
 # =========================
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
-# Evita prompts e melhora consistência
 ENV CI=true
 
-# 1) Dependências (inclui devDependencies para existir `nest`)
+# Instala deps (inclui devDependencies -> traz @nestjs/cli e o binário `nest`)
 COPY package.json package-lock.json ./
 RUN npm ci --include=dev
 
-# 2) Código
+# Copia o código
 COPY . .
 
-# 3) Prisma generate (não precisa de DB)
+# Gera client do Prisma (não precisa de DB)
 RUN npx prisma generate
 
-# 4) Build (usa nest via node_modules/.bin)
+# Build (usa `nest build`, encontrado em node_modules/.bin)
 RUN npm run build
 
 
 # =========================
-# Runner: somente prod deps + artefatos buildados
+# Runner: apenas prod deps + dist + prisma + entrypoint
 # =========================
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
@@ -32,15 +31,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Instala SOMENTE deps de produção
+# Instala SOMENTE dependências de produção
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-# Copia build + prisma (schema/migrations)
+# Copia artefatos gerados
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 
-# Entry point
+# Copia entrypoint
 COPY entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
