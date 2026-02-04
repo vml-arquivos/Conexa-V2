@@ -1,4 +1,3 @@
-_Gerado por MANUZ, IA Engenheira de Software Sênior._
 
 # Conexa - Plataforma de Gestão Educacional
 
