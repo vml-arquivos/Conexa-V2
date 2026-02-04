@@ -1,8 +1,21 @@
+# Node
 node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Build output
 dist
+
+# VCS
 .git
 .gitignore
+
+# Editor/OS
+.vscode
+.idea
+.DS_Store
+
+# Env (nunca vai pra imagem)
 .env
 .env.*
-EXECUTION_LOGS*
-*.zip
