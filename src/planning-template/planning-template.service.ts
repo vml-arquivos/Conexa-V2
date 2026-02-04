@@ -8,7 +8,7 @@ import { AuditService } from '../common/services/audit.service';
 import { CreatePlanningTemplateDto } from './dto/create-planning-template.dto';
 import { UpdatePlanningTemplateDto } from './dto/update-planning-template.dto';
 import { QueryPlanningTemplateDto } from './dto/query-planning-template.dto';
-import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RoleLevel } from '@prisma/client';
 
 @Injectable()
@@ -26,38 +26,14 @@ export class PlanningTemplateService {
     // Validar permissão
     this.validateCreatePermission(user);
 
-    // Usar mantenedoraId do usuário se não fornecido
-    const mantenedoraId = createDto.mantenedoraId || user.mantenedoraId;
-
-    // Validar se o usuário tem acesso à mantenedora
-    if (
-      !user.roles.some((role) => role.level === RoleLevel.DEVELOPER) &&
-      mantenedoraId !== user.mantenedoraId
-    ) {
-      throw new ForbiddenException(
-        'Você não tem permissão para criar templates para esta mantenedora',
-      );
-    }
+    // Templates não têm escopo de mantenedora no schema atual
 
     const template = await this.prisma.planningTemplate.create({
       data: {
         name: createDto.name,
         description: createDto.description,
-        type: createDto.type,
         sections: createDto.sections,
         fields: createDto.fields,
-        mantenedoraId,
-        createdBy: user.sub,
-      },
-      include: {
-        createdByUser: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
       },
     });
 
@@ -66,7 +42,7 @@ export class PlanningTemplateService {
       'PlanningTemplate',
       template.id,
       user.sub,
-      mantenedoraId,
+      user.mantenedoraId,
       undefined,
       template,
     );
@@ -78,23 +54,9 @@ export class PlanningTemplateService {
    * Lista templates com filtros
    */
   async findAll(query: QueryPlanningTemplateDto, user: JwtPayload) {
-    const where: any = {
-      deletedAt: null,
-    };
+    const where: any = {};
 
-    // Filtro por escopo do usuário
-    if (!user.roles.some((role) => role.level === RoleLevel.DEVELOPER)) {
-      where.mantenedoraId = user.mantenedoraId;
-    }
-
-    // Aplicar filtros da query
-    if (query.mantenedoraId) {
-      where.mantenedoraId = query.mantenedoraId;
-    }
-
-    if (query.type) {
-      where.type = query.type;
-    }
+    // Templates não têm escopo de mantenedora no schema atual
 
     if (query.search) {
       where.OR = [
@@ -106,14 +68,6 @@ export class PlanningTemplateService {
     const templates = await this.prisma.planningTemplate.findMany({
       where,
       include: {
-        createdByUser: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
         _count: {
           select: {
             plannings: true,
@@ -135,14 +89,6 @@ export class PlanningTemplateService {
     const template = await this.prisma.planningTemplate.findUnique({
       where: { id },
       include: {
-        createdByUser: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
         _count: {
           select: {
             plannings: true,
@@ -151,7 +97,7 @@ export class PlanningTemplateService {
       },
     });
 
-    if (!template || template.deletedAt) {
+    if (!template) {
       throw new NotFoundException('Template não encontrado');
     }
 
@@ -173,7 +119,7 @@ export class PlanningTemplateService {
       where: { id },
     });
 
-    if (!template || template.deletedAt) {
+    if (!template) {
       throw new NotFoundException('Template não encontrado');
     }
 
@@ -188,19 +134,8 @@ export class PlanningTemplateService {
       data: {
         ...(updateDto.name && { name: updateDto.name }),
         ...(updateDto.description && { description: updateDto.description }),
-        ...(updateDto.type && { type: updateDto.type }),
         ...(updateDto.sections && { sections: updateDto.sections }),
         ...(updateDto.fields && { fields: updateDto.fields }),
-      },
-      include: {
-        createdByUser: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
       },
     });
 
@@ -209,7 +144,7 @@ export class PlanningTemplateService {
       'PlanningTemplate',
       id,
       user.sub,
-      template.mantenedoraId,
+      user.mantenedoraId,
       undefined,
       template,
       updatedTemplate,
@@ -233,7 +168,7 @@ export class PlanningTemplateService {
       },
     });
 
-    if (!template || template.deletedAt) {
+    if (!template) {
       throw new NotFoundException('Template não encontrado');
     }
 
@@ -253,7 +188,7 @@ export class PlanningTemplateService {
     await this.prisma.planningTemplate.update({
       where: { id },
       data: {
-        deletedAt: new Date(),
+        isActive: false,
       },
     });
 
@@ -262,7 +197,7 @@ export class PlanningTemplateService {
       'PlanningTemplate',
       id,
       user.sub,
-      template.mantenedoraId,
+      user.mantenedoraId,
       undefined,
       template,
     );
@@ -315,8 +250,6 @@ export class PlanningTemplateService {
       return;
     }
 
-    if (template.mantenedoraId !== user.mantenedoraId) {
-      throw new ForbiddenException('Acesso negado a este template');
-    }
+    // Templates não têm escopo de mantenedora no schema atual
   }
 }

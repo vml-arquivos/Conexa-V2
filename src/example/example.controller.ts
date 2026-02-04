@@ -8,7 +8,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequireRoles } from '../common/decorators/roles.decorator';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { Public } from '../common/decorators/public.decorator';
-import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 @Controller('example')
 export class ExampleController {

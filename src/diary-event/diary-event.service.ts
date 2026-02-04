@@ -9,8 +9,8 @@ import { AuditService } from '../common/services/audit.service';
 import { CreateDiaryEventDto } from './dto/create-diary-event.dto';
 import { UpdateDiaryEventDto } from './dto/update-diary-event.dto';
 import { QueryDiaryEventDto } from './dto/query-diary-event.dto';
-import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { RoleLevel } from '@prisma/client';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { RoleLevel, PlanningStatus } from '@prisma/client';
 import {
   getPedagogicalDay,
   isSamePedagogicalDay,
@@ -35,7 +35,7 @@ export class DiaryEventService {
         enrollments: {
           where: {
             classroomId: createDto.classroomId,
-            status: 'ATIVO',
+            status: 'ATIVA',
           },
         },
       },
@@ -54,6 +54,14 @@ export class DiaryEventService {
     // Validar se a turma existe
     const classroom = await this.prisma.classroom.findUnique({
       where: { id: createDto.classroomId },
+      include: {
+        unit: {
+          select: {
+            id: true,
+            mantenedoraId: true,
+          },
+        },
+      },
     });
 
     if (!classroom) {
@@ -76,19 +84,14 @@ export class DiaryEventService {
       throw new NotFoundException('Planejamento não encontrado');
     }
 
-    // VALIDAÇÃO CRÍTICA 2: Planning deve estar ACTIVE
-    if (planning.status !== 'ACTIVE') {
+    // VALIDAÇÃO CRÍTICA 2: Planning deve estar EM_EXECUCAO
+    if (planning.status !== PlanningStatus.EM_EXECUCAO) {
       throw new BadRequestException(
         `Apenas planejamentos ativos podem receber eventos. Status atual: ${planning.status}`,
       );
     }
 
-    // VALIDAÇÃO CRÍTICA 3: Planning deve ser SEMANAL
-    if (planning.type !== 'SEMANAL') {
-      throw new BadRequestException(
-        `Apenas planejamentos semanais podem receber eventos. Tipo atual: ${planning.type}`,
-      );
-    }
+    // Planning type não existe mais no schema
 
     // VALIDAÇÃO CRÍTICA 4: Data do evento deve estar dentro do período do Planning
     const eventDate = new Date(createDto.eventDate);
@@ -149,8 +152,8 @@ export class DiaryEventService {
         tags: createDto.tags || [],
         aiContext: createDto.aiContext || {},
         mediaUrls: createDto.mediaUrls || [],
-        createdBy: user.userId,
-        mantenedoraId: classroom.mantenedoraId,
+        createdBy: user.sub,
+        mantenedoraId: classroom.unit.mantenedoraId,
         unitId: classroom.unitId,
       },
       include: {
@@ -183,7 +186,7 @@ export class DiaryEventService {
       'DiaryEvent',
       diaryEvent.id,
       user.sub,
-      classroom.mantenedoraId,
+        classroom.unit.mantenedoraId,
       classroom.unitId,
       diaryEvent,
     );
@@ -195,9 +198,7 @@ export class DiaryEventService {
    * Lista eventos com filtros
    */
   async findAll(query: QueryDiaryEventDto, user: JwtPayload) {
-    const where: any = {
-      deletedAt: null, // Apenas eventos não deletados
-    };
+    const where: any = {};
 
     // Filtro por escopo do usuário
     if (!user.roles.some((role) => role.level === RoleLevel.DEVELOPER)) {
@@ -336,7 +337,7 @@ export class DiaryEventService {
       },
     });
 
-    if (!event || event.deletedAt) {
+    if (!event) {
       throw new NotFoundException('Evento não encontrado');
     }
 
@@ -357,7 +358,7 @@ export class DiaryEventService {
       },
     });
 
-    if (!event || event.deletedAt) {
+    if (!event) {
       throw new NotFoundException('Evento não encontrado');
     }
 
@@ -444,7 +445,7 @@ export class DiaryEventService {
       },
     });
 
-    if (!event || event.deletedAt) {
+    if (!event) {
       throw new NotFoundException('Evento não encontrado');
     }
 
@@ -470,7 +471,7 @@ export class DiaryEventService {
     await this.prisma.diaryEvent.update({
       where: { id },
       data: {
-        deletedAt: new Date(),
+        status: 'ARQUIVADO' as any,
       },
     });
 
@@ -501,7 +502,7 @@ export class DiaryEventService {
 
     // Mantenedora: validar mantenedoraId
     if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
-      if (classroom.mantenedoraId !== user.mantenedoraId) {
+      if (classroom.unit.mantenedoraId !== user.mantenedoraId) {
         throw new ForbiddenException(
           'Você não tem permissão para criar eventos nesta turma',
         );
@@ -537,7 +538,7 @@ export class DiaryEventService {
       const isTeacher = await this.prisma.classroomTeacher.findFirst({
         where: {
           classroomId: classroom.id,
-          teacherId: user.userId,
+          teacherId: user.sub,
           isActive: true,
         },
       });

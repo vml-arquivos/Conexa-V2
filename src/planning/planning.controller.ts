@@ -18,7 +18,7 @@ import { ChangeStatusDto } from './dto/change-status.dto';
 import { QueryPlanningDto } from './dto/query-planning.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 @Controller('plannings')
 @UseGuards(JwtAuthGuard)

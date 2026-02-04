@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { RoleLevel } from '@prisma/client';
-import { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
+import type { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
 import { PrismaService } from '../../prisma/prisma.service';
 
 /**

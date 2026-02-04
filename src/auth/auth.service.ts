@@ -7,7 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
-import { JwtPayload } from './interfaces/jwt-payload.interface';
+import type { JwtPayload } from './interfaces/jwt-payload.interface';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -140,9 +140,11 @@ export class AuthService {
    * Gera um access token JWT
    */
   private async generateAccessToken(payload: JwtPayload): Promise<string> {
-    return this.jwtService.signAsync(payload, {
-      secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN'),
+    const secret = this.configService.get<string>('JWT_SECRET');
+    const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '15m';
+    return this.jwtService.signAsync(payload as any, {
+      secret,
+      expiresIn: expiresIn as any,
     });
   }
 
@@ -150,9 +152,11 @@ export class AuthService {
    * Gera um refresh token JWT
    */
   private async generateRefreshToken(payload: JwtPayload): Promise<string> {
-    return this.jwtService.signAsync(payload, {
-      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN'),
+    const secret = this.configService.get<string>('JWT_REFRESH_SECRET');
+    const expiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d';
+    return this.jwtService.signAsync(payload as any, {
+      secret,
+      expiresIn: expiresIn as any,
     });
   }
 

@@ -11,8 +11,8 @@ import { CreatePlanningDto } from './dto/create-planning.dto';
 import { UpdatePlanningDto } from './dto/update-planning.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { QueryPlanningDto } from './dto/query-planning.dto';
-import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { RoleLevel, PlanningStatus } from '@prisma/client';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { RoleLevel, PlanningStatus, AuditLogAction } from '@prisma/client';
 
 @Injectable()
 export class PlanningService {
@@ -54,6 +54,14 @@ export class PlanningService {
     // Validar se a turma existe
     const classroom = await this.prisma.classroom.findUnique({
       where: { id: createDto.classroomId },
+      include: {
+        unit: {
+          select: {
+            id: true,
+            mantenedoraId: true,
+          },
+        },
+      },
     });
 
     if (!classroom) {
@@ -77,7 +85,7 @@ export class PlanningService {
     const existingActivePlanning = await this.prisma.planning.findFirst({
       where: {
         classroomId: createDto.classroomId,
-        status: PlanningStatus.ACTIVE,
+        status: PlanningStatus.EM_EXECUCAO,
         OR: [
           {
             AND: [
@@ -106,7 +114,7 @@ export class PlanningService {
         startDate,
         endDate,
         // Campos legados
-        objectives: createDto.objectives,
+        objectives: createDto.objectives ? JSON.stringify(createDto.objectives) : null,
         activities: createDto.activities,
         resources: createDto.resources,
         evaluation: createDto.evaluation,
@@ -115,8 +123,8 @@ export class PlanningService {
         // NOVO: Conteúdo pedagógico de autoria docente
         pedagogicalContent: createDto.pedagogicalContent,
         status: PlanningStatus.RASCUNHO,
-        createdBy: user.userId,
-        mantenedoraId: classroom.mantenedoraId,
+        createdBy: user.sub,
+        mantenedoraId: classroom.unit.mantenedoraId,
         unitId: classroom.unitId,
       },
       include: {
@@ -124,7 +132,6 @@ export class PlanningService {
           select: {
             id: true,
             name: true,
-            type: true,
           },
         },
         classroom: {
@@ -149,7 +156,7 @@ export class PlanningService {
       'Planning',
       planning.id,
       user.sub,
-      classroom.mantenedoraId,
+      classroom.unit.mantenedoraId,
       classroom.unitId,
       planning,
     );
@@ -236,7 +243,6 @@ export class PlanningService {
           select: {
             id: true,
             name: true,
-            type: true,
           },
         },
         classroom: {
@@ -321,7 +327,7 @@ export class PlanningService {
     await this.validateAccess(planning, user);
 
     // Validar se pode editar
-    if (planning.status === PlanningStatus.CLOSED) {
+    if (planning.status === PlanningStatus.CONCLUIDO) {
       throw new ForbiddenException(
         'Planejamentos fechados não podem ser editados',
       );
@@ -329,7 +335,7 @@ export class PlanningService {
 
     // Professor só pode editar DRAFT
     if (user.roles.some((role) => role.level === RoleLevel.PROFESSOR)) {
-      if (planning.status !== PlanningStatus.DRAFT) {
+      if (planning.status !== PlanningStatus.RASCUNHO) {
         throw new ForbiddenException(
           'Professores só podem editar planejamentos em rascunho',
         );
@@ -357,7 +363,7 @@ export class PlanningService {
       data: {
         ...(updateDto.startDate && { startDate: new Date(updateDto.startDate) }),
         ...(updateDto.endDate && { endDate: new Date(updateDto.endDate) }),
-        ...(updateDto.objectives && { objectives: updateDto.objectives }),
+        ...(updateDto.objectives && { objectives: JSON.stringify(updateDto.objectives) }),
         ...(updateDto.activities && { activities: updateDto.activities }),
         ...(updateDto.resources && { resources: updateDto.resources }),
         ...(updateDto.bnccAreas && { bnccAreas: updateDto.bnccAreas }),
@@ -418,8 +424,8 @@ export class PlanningService {
     // Professor não pode ativar ou fechar planejamentos
     if (user.roles.some((role) => role.level === RoleLevel.PROFESSOR)) {
       if (
-        changeStatusDto.status === PlanningStatus.ACTIVE ||
-        changeStatusDto.status === PlanningStatus.CLOSED
+        changeStatusDto.status === PlanningStatus.EM_EXECUCAO ||
+        changeStatusDto.status === PlanningStatus.CONCLUIDO
       ) {
         throw new ForbiddenException(
           'Professores não podem ativar ou fechar planejamentos',
@@ -428,11 +434,11 @@ export class PlanningService {
     }
 
     // Se ativando, verificar conflitos
-    if (changeStatusDto.status === PlanningStatus.ACTIVE) {
+    if (changeStatusDto.status === PlanningStatus.EM_EXECUCAO) {
       const existingActivePlanning = await this.prisma.planning.findFirst({
         where: {
           classroomId: planning.classroomId,
-          status: PlanningStatus.ACTIVE,
+          status: PlanningStatus.EM_EXECUCAO,
           id: { not: id },
           OR: [
             {
@@ -473,8 +479,8 @@ export class PlanningService {
 
     // Registrar auditoria
     await this.auditService.log({
-      action: 'UPDATE' as any,
-      entityType: 'Planning',
+      action: AuditLogAction.UPDATE,
+      entity: 'PLANNING' as any,
       entityId: id,
       userId: user.sub,
       mantenedoraId: planning.mantenedoraId,
@@ -504,7 +510,7 @@ export class PlanningService {
 
     // Mantenedora: validar mantenedoraId
     if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
-      if (classroom.mantenedoraId !== user.mantenedoraId) {
+      if (classroom.unit.mantenedoraId !== user.mantenedoraId) {
         throw new ForbiddenException(
           'Você não tem permissão para criar planejamentos nesta turma',
         );
@@ -605,30 +611,30 @@ export class PlanningService {
   ): void {
     // DRAFT pode ir para ACTIVE
     if (
-      currentStatus === PlanningStatus.DRAFT &&
-      newStatus === PlanningStatus.ACTIVE
+      currentStatus === PlanningStatus.RASCUNHO &&
+      newStatus === PlanningStatus.EM_EXECUCAO
     ) {
       return;
     }
 
     // ACTIVE pode ir para CLOSED
     if (
-      currentStatus === PlanningStatus.ACTIVE &&
-      newStatus === PlanningStatus.CLOSED
+      currentStatus === PlanningStatus.EM_EXECUCAO &&
+      newStatus === PlanningStatus.CONCLUIDO
     ) {
       return;
     }
 
     // ACTIVE pode voltar para DRAFT
     if (
-      currentStatus === PlanningStatus.ACTIVE &&
-      newStatus === PlanningStatus.DRAFT
+      currentStatus === PlanningStatus.EM_EXECUCAO &&
+      newStatus === PlanningStatus.RASCUNHO
     ) {
       return;
     }
 
     // CLOSED não pode mudar de status
-    if (currentStatus === PlanningStatus.CLOSED) {
+    if (currentStatus === PlanningStatus.CONCLUIDO) {
       throw new BadRequestException(
         'Planejamentos fechados não podem ter o status alterado',
       );

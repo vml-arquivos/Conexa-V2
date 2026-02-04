@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
 import { CurriculumPdfParserService, ParsedMatrixEntry } from './curriculum-pdf-parser.service';
 import { ImportCurriculumDto, ImportMatrixDto, ImportMode } from './dto/import-curriculum.dto';
-import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RoleLevel, AuditLogAction, AuditLogEntity } from '@prisma/client';
 import { getPedagogicalDay } from '../common/utils/date.utils';
 
@@ -92,14 +92,14 @@ export class CurriculumImportService {
     );
 
     // Registrar auditoria
-    await this.auditService.logAction(
-      AuditLogAction.IMPORT,
-      AuditLogEntity.CURRICULUM_MATRIX,
-      matrixId,
-      user.sub,
-      matrix.mantenedoraId,
-      null,
-      {
+    await this.auditService.log({
+      action: AuditLogAction.IMPORT,
+      entity: AuditLogEntity.CURRICULUM_MATRIX,
+      entityId: matrixId,
+      userId: user.sub,
+      mantenedoraId: matrix.mantenedoraId,
+      unitId: undefined,
+      changes: {
         totalExtracted: parserResult.totalExtracted,
         totalInserted: result.inserts,
         totalUpdated: result.updates,
@@ -107,7 +107,7 @@ export class CurriculumImportService {
         sourceUrl: dto.sourceUrl,
         force: dto.force,
       },
-    );
+    });
 
     return {
       mode: ImportMode.APPLY,

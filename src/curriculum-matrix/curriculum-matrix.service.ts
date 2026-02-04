@@ -9,7 +9,7 @@ import { AuditService } from '../common/services/audit.service';
 import { CreateCurriculumMatrixDto } from './dto/create-curriculum-matrix.dto';
 import { UpdateCurriculumMatrixDto } from './dto/update-curriculum-matrix.dto';
 import { QueryCurriculumMatrixDto } from './dto/query-curriculum-matrix.dto';
-import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 @Injectable()
 export class CurriculumMatrixService {
@@ -25,9 +25,9 @@ export class CurriculumMatrixService {
   async create(createDto: CreateCurriculumMatrixDto, user: JwtPayload) {
     // Validar permissão
     if (
-      user.roleLevel !== 'DEVELOPER' &&
-      user.roleLevel !== 'MANTENEDORA' &&
-      user.roleLevel !== 'STAFF_CENTRAL'
+      user.roles[0]?.level !== 'DEVELOPER' &&
+      user.roles[0]?.level !== 'MANTENEDORA' &&
+      user.roles[0]?.level !== 'STAFF_CENTRAL'
     ) {
       throw new ForbiddenException(
         'Apenas Mantenedora e Staff Central podem criar matrizes curriculares',
@@ -55,8 +55,8 @@ export class CurriculumMatrixService {
       data: {
         ...createDto,
         mantenedoraId: user.mantenedoraId,
-        createdBy: user.userId,
-        updatedBy: user.userId,
+        createdBy: user.sub,
+        updatedBy: user.sub,
       },
       include: {
         entries: true,
@@ -68,9 +68,9 @@ export class CurriculumMatrixService {
       action: 'CREATE',
       entity: 'CURRICULUM_MATRIX',
       entityId: matrix.id,
-      userId: user.userId,
+      userId: user.sub,
       mantenedoraId: user.mantenedoraId,
-      details: { matrixName: matrix.name, year: matrix.year, segment: matrix.segment },
+      changes: { matrixName: matrix.name, year: matrix.year, segment: matrix.segment },
     });
 
     return matrix;
@@ -132,7 +132,7 @@ export class CurriculumMatrixService {
       throw new NotFoundException('Matriz curricular não encontrada');
     }
 
-    if (matrix.mantenedoraId !== user.mantenedoraId && user.roleLevel !== 'DEVELOPER') {
+    if (matrix.mantenedoraId !== user.mantenedoraId && user.roles[0]?.level !== 'DEVELOPER') {
       throw new ForbiddenException('Acesso negado a esta matriz');
     }
 
@@ -145,9 +145,9 @@ export class CurriculumMatrixService {
   async update(id: string, updateDto: UpdateCurriculumMatrixDto, user: JwtPayload) {
     // Validar permissão
     if (
-      user.roleLevel !== 'DEVELOPER' &&
-      user.roleLevel !== 'MANTENEDORA' &&
-      user.roleLevel !== 'STAFF_CENTRAL'
+      user.roles[0]?.level !== 'DEVELOPER' &&
+      user.roles[0]?.level !== 'MANTENEDORA' &&
+      user.roles[0]?.level !== 'STAFF_CENTRAL'
     ) {
       throw new ForbiddenException(
         'Apenas Mantenedora e Staff Central podem atualizar matrizes',
@@ -171,7 +171,7 @@ export class CurriculumMatrixService {
       where: { id },
       data: {
         ...updateDto,
-        updatedBy: user.userId,
+        updatedBy: user.sub,
       },
       include: {
         entries: true,
@@ -183,9 +183,9 @@ export class CurriculumMatrixService {
       action: 'UPDATE',
       entity: 'CURRICULUM_MATRIX',
       entityId: id,
-      userId: user.userId,
+      userId: user.sub,
       mantenedoraId: user.mantenedoraId,
-      details: { before: matrix, after: updated },
+      changes: { before: matrix, after: updated },
     });
 
     return updated;
@@ -196,7 +196,7 @@ export class CurriculumMatrixService {
    */
   async remove(id: string, user: JwtPayload) {
     // Validar permissão
-    if (user.roleLevel !== 'DEVELOPER' && user.roleLevel !== 'MANTENEDORA') {
+    if (user.roles[0]?.level !== 'DEVELOPER' && user.roles[0]?.level !== 'MANTENEDORA') {
       throw new ForbiddenException('Apenas Mantenedora pode deletar matrizes');
     }
 
@@ -223,9 +223,9 @@ export class CurriculumMatrixService {
       action: 'DELETE',
       entity: 'CURRICULUM_MATRIX',
       entityId: id,
-      userId: user.userId,
+      userId: user.sub,
       mantenedoraId: user.mantenedoraId,
-      details: { matrixName: matrix.name },
+      changes: { matrixName: matrix.name },
     });
 
     return { message: 'Matriz curricular desativada com sucesso' };
@@ -235,7 +235,7 @@ export class CurriculumMatrixService {
    * Validar acesso do usuário
    */
   private async validateAccess(user: JwtPayload) {
-    if (user.roleLevel === 'DEVELOPER') {
+    if (user.roles[0]?.level === 'DEVELOPER') {
       return; // Developer tem acesso total
     }
 

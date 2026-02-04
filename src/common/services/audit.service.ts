@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { AuditAction } from '@prisma/client';
+import { AuditLogAction } from '@prisma/client';
 
 @Injectable()
 export class AuditService {
@@ -10,26 +10,26 @@ export class AuditService {
    * Registra uma ação no log de auditoria
    */
   async log(params: {
-    action: AuditAction;
-    entityType: string;
+    action: AuditLogAction;
+    entity: any;
     entityId: string;
     userId: string;
     mantenedoraId: string;
     unitId?: string;
     changes?: Record<string, any>;
-    metadata?: Record<string, any>;
+    description?: string;
   }) {
     try {
       await this.prisma.auditLog.create({
         data: {
           action: params.action,
-          entityType: params.entityType,
+          entity: params.entity,
           entityId: params.entityId,
           userId: params.userId,
           mantenedoraId: params.mantenedoraId,
           unitId: params.unitId,
-          changes: params.changes || {},
-          metadata: params.metadata || {},
+          changes: params.changes,
+          description: params.description,
         },
       });
     } catch (error) {
@@ -42,7 +42,7 @@ export class AuditService {
    * Registra criação de entidade
    */
   async logCreate(
-    entityType: string,
+    entity: any,
     entityId: string,
     userId: string,
     mantenedoraId: string,
@@ -50,8 +50,8 @@ export class AuditService {
     data?: any,
   ) {
     return this.log({
-      action: AuditAction.CREATE,
-      entityType,
+      action: AuditLogAction.CREATE,
+      entity,
       entityId,
       userId,
       mantenedoraId,
@@ -64,7 +64,7 @@ export class AuditService {
    * Registra atualização de entidade
    */
   async logUpdate(
-    entityType: string,
+    entity: any,
     entityId: string,
     userId: string,
     mantenedoraId: string,
@@ -73,8 +73,8 @@ export class AuditService {
     newData?: any,
   ) {
     return this.log({
-      action: AuditAction.UPDATE,
-      entityType,
+      action: AuditLogAction.UPDATE,
+      entity,
       entityId,
       userId,
       mantenedoraId,
@@ -87,7 +87,7 @@ export class AuditService {
    * Registra deleção de entidade
    */
   async logDelete(
-    entityType: string,
+    entity: any,
     entityId: string,
     userId: string,
     mantenedoraId: string,
@@ -95,8 +95,8 @@ export class AuditService {
     data?: any,
   ) {
     return this.log({
-      action: AuditAction.DELETE,
-      entityType,
+      action: AuditLogAction.DELETE,
+      entity,
       entityId,
       userId,
       mantenedoraId,

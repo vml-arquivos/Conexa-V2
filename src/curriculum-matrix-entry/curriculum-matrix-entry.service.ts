@@ -9,7 +9,7 @@ import { AuditService } from '../common/services/audit.service';
 import { CreateCurriculumMatrixEntryDto } from './dto/create-curriculum-matrix-entry.dto';
 import { UpdateCurriculumMatrixEntryDto } from './dto/update-curriculum-matrix-entry.dto';
 import { QueryCurriculumMatrixEntryDto } from './dto/query-curriculum-matrix-entry.dto';
-import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 @Injectable()
 export class CurriculumMatrixEntryService {
@@ -25,9 +25,9 @@ export class CurriculumMatrixEntryService {
   async create(createDto: CreateCurriculumMatrixEntryDto, user: JwtPayload) {
     // Validar permissão
     if (
-      user.roleLevel !== 'DEVELOPER' &&
-      user.roleLevel !== 'MANTENEDORA' &&
-      user.roleLevel !== 'STAFF_CENTRAL'
+      user.roles[0]?.level !== 'DEVELOPER' &&
+      user.roles[0]?.level !== 'MANTENEDORA' &&
+      user.roles[0]?.level !== 'STAFF_CENTRAL'
     ) {
       throw new ForbiddenException(
         'Apenas Mantenedora e Staff Central podem criar entradas na matriz',
@@ -43,7 +43,7 @@ export class CurriculumMatrixEntryService {
       throw new NotFoundException('Matriz curricular não encontrada');
     }
 
-    if (matrix.mantenedoraId !== user.mantenedoraId && user.roleLevel !== 'DEVELOPER') {
+    if (matrix.mantenedoraId !== user.mantenedoraId && user.roles[0]?.level !== 'DEVELOPER') {
       throw new ForbiddenException('Acesso negado a esta matriz');
     }
 
@@ -78,9 +78,9 @@ export class CurriculumMatrixEntryService {
       action: 'CREATE',
       entity: 'CURRICULUM_MATRIX_ENTRY',
       entityId: entry.id,
-      userId: user.userId,
+      userId: user.sub,
       mantenedoraId: user.mantenedoraId,
-      details: {
+      changes: {
         matrixId: entry.matrixId,
         date: entry.date,
         campoDeExperiencia: entry.campoDeExperiencia,
@@ -109,7 +109,7 @@ export class CurriculumMatrixEntryService {
         throw new NotFoundException('Matriz curricular não encontrada');
       }
 
-      if (matrix.mantenedoraId !== user.mantenedoraId && user.roleLevel !== 'DEVELOPER') {
+      if (matrix.mantenedoraId !== user.mantenedoraId && user.roles[0]?.level !== 'DEVELOPER') {
         throw new ForbiddenException('Acesso negado a esta matriz');
       }
 
@@ -193,7 +193,7 @@ export class CurriculumMatrixEntryService {
       throw new NotFoundException('Entrada da matriz não encontrada');
     }
 
-    if (entry.matrix.mantenedoraId !== user.mantenedoraId && user.roleLevel !== 'DEVELOPER') {
+    if (entry.matrix.mantenedoraId !== user.mantenedoraId && user.roles[0]?.level !== 'DEVELOPER') {
       throw new ForbiddenException('Acesso negado a esta entrada');
     }
 
@@ -206,9 +206,9 @@ export class CurriculumMatrixEntryService {
   async update(id: string, updateDto: UpdateCurriculumMatrixEntryDto, user: JwtPayload) {
     // Validar permissão
     if (
-      user.roleLevel !== 'DEVELOPER' &&
-      user.roleLevel !== 'MANTENEDORA' &&
-      user.roleLevel !== 'STAFF_CENTRAL'
+      user.roles[0]?.level !== 'DEVELOPER' &&
+      user.roles[0]?.level !== 'MANTENEDORA' &&
+      user.roles[0]?.level !== 'STAFF_CENTRAL'
     ) {
       throw new ForbiddenException(
         'Apenas Mantenedora e Staff Central podem atualizar entradas',
@@ -244,9 +244,9 @@ export class CurriculumMatrixEntryService {
       action: 'UPDATE',
       entity: 'CURRICULUM_MATRIX_ENTRY',
       entityId: id,
-      userId: user.userId,
+      userId: user.sub,
       mantenedoraId: user.mantenedoraId,
-      details: { before: entry, after: updated },
+      changes: { before: entry, after: updated },
     });
 
     return updated;
@@ -257,7 +257,7 @@ export class CurriculumMatrixEntryService {
    */
   async remove(id: string, user: JwtPayload) {
     // Validar permissão
-    if (user.roleLevel !== 'DEVELOPER' && user.roleLevel !== 'MANTENEDORA') {
+    if (user.roles[0]?.level !== 'DEVELOPER' && user.roles[0]?.level !== 'MANTENEDORA') {
       throw new ForbiddenException('Apenas Mantenedora pode deletar entradas');
     }
 
@@ -283,9 +283,9 @@ export class CurriculumMatrixEntryService {
       action: 'DELETE',
       entity: 'CURRICULUM_MATRIX_ENTRY',
       entityId: id,
-      userId: user.userId,
+      userId: user.sub,
       mantenedoraId: user.mantenedoraId,
-      details: { entry },
+      changes: { entry },
     });
 
     return { message: 'Entrada da matriz deletada com sucesso' };
@@ -295,7 +295,7 @@ export class CurriculumMatrixEntryService {
    * Validar acesso do usuário
    */
   private async validateAccess(user: JwtPayload) {
-    if (user.roleLevel === 'DEVELOPER') {
+    if (user.roles[0]?.level === 'DEVELOPER') {
       return; // Developer tem acesso total
     }
 
