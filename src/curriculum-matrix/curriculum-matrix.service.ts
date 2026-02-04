@@ -232,6 +232,62 @@ export class CurriculumMatrixService {
   }
 
   /**
+   * Obter status do último import da matriz
+   */
+  async getImportStatus(id: string, user: JwtPayload) {
+    // Verificar se matriz existe
+    const matrix = await this.prisma.curriculumMatrix.findUnique({
+      where: { id },
+    });
+
+    if (!matrix) {
+      throw new NotFoundException('Matriz curricular não encontrada');
+    }
+
+    // Buscar último registro de import no AuditLog
+    const lastImport = await this.prisma.auditLog.findFirst({
+      where: {
+        entity: 'CURRICULUM_MATRIX',
+        action: 'IMPORT',
+        entityId: id,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!lastImport) {
+      throw new NotFoundException('No import found for this matrix');
+    }
+
+    // Parse changes JSON para extrair dados do import
+    const changes = lastImport.changes as any;
+
+    return {
+      matrixId: id,
+      lastImportAt: lastImport.createdAt.toISOString(),
+      importedBy: lastImport.user ? {
+        id: lastImport.user.id,
+        name: `${lastImport.user.firstName} ${lastImport.user.lastName}`,
+        email: lastImport.user.email,
+      } : null,
+      pdfHash: changes.pdfHash || null,
+      result: changes.result || 'SUCCESS',
+      totalEntries: changes.totalExtracted || changes.totalInserted || 0,
+    };
+  }
+
+  /**
    * Validar acesso do usuário
    */
   private async validateAccess(user: JwtPayload) {

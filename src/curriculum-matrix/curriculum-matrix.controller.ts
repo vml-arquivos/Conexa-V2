@@ -58,4 +58,10 @@ export class CurriculumMatrixController {
   remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.curriculumMatrixService.remove(id, user);
   }
+
+  @Get(':id/import/status')
+  @RequireRoles('DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL')
+  getImportStatus(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.curriculumMatrixService.getImportStatus(id, user);
+  }
 }
