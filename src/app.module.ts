@@ -12,6 +12,7 @@ import { PlanningModule } from './planning/planning.module';
 import { CurriculumMatrixModule } from './curriculum-matrix/curriculum-matrix.module';
 import { CurriculumMatrixEntryModule } from './curriculum-matrix-entry/curriculum-matrix-entry.module';
 import { CurriculumImportModule } from './curriculum-import/curriculum-import.module';
+import { HealthModule } from './health/health.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
@@ -29,6 +30,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     CurriculumMatrixModule,
     CurriculumMatrixEntryModule,
     CurriculumImportModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
