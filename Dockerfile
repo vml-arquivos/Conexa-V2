@@ -1,21 +1,4 @@
-# syntax=docker/dockerfile:1
-
-FROM node:20-bookworm-slim AS builder
-WORKDIR /app
-
-RUN apt-get update -y \
- && apt-get install -y --no-install-recommends openssl ca-certificates curl wget dumb-init \
- && rm -rf /var/lib/apt/lists/*
-
-COPY package.json package-lock.json ./
-RUN npm ci --include=dev
-
-COPY . .
-RUN npm run prisma:generate
-RUN npm run build
-
-
-FROM node:20-bookworm-slim AS runner
+FROM node:20-bookworm-slim
 WORKDIR /app
 
 RUN apt-get update -y \
@@ -25,10 +8,12 @@ RUN apt-get update -y \
 ENV NODE_ENV=production
 ENV PORT=3000
 
-COPY --from=builder /app/package.json /app/package-lock.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
+COPY package.json package-lock.json ./
+RUN npm ci --include=dev
+
+COPY . .
+RUN npm run prisma:generate
+RUN npm run build
 
 RUN npm prune --omit=dev && npm cache clean --force
 RUN test -f /app/dist/src/main.js
