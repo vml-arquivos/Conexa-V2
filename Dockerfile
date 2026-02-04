@@ -1,39 +1,23 @@
-# syntax=docker/dockerfile:1
-
-FROM node:20-bookworm-slim AS builder
+FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 
 RUN apt-get update -y \
  && apt-get install -y --no-install-recommends openssl ca-certificates curl wget dumb-init \
  && rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json ./
-RUN npm ci --include=dev
-
-COPY . .
-RUN npm run prisma:generate
-RUN npm run build
-
-
-FROM node:20-bookworm-slim AS runner
-WORKDIR /app
-
-RUN apt-get update -y \
-  && apt-get install -y --no-install-recommends openssl ca-certificates curl dumb-init \
-  && rm -rf /var/lib/apt/lists/*
-
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Copia tudo pronto do builder (inclusive Prisma Client gerado)
-COPY --from=builder /app/package.json /app/package-lock.json ./
-COPY --from=builder /app/node_modules ./node_modules
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 
-# Remove dev deps do node_modules (mantém Prisma Client gerado)
-RUN npm prune --omit=dev \
-  && npm cache clean --force
+# Prisma Client: se seu runtime precisa do client gerado e você não tem prisma CLI em prod,
+# copie as pastas geradas do builder:
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 RUN test -f /app/dist/src/main.js
 
