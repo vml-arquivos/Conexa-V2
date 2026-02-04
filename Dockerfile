@@ -10,10 +10,12 @@ RUN apt-get update -y \
     dumb-init \
  && rm -rf /var/lib/apt/lists/*
 
-ENV NODE_ENV=production
 ENV PORT=3000
 
 COPY package.json package-lock.json ./
+
+# ✅ GARANTE devDependencies (nest cli) no build
+ENV NODE_ENV=development
 RUN npm ci
 
 COPY . .
@@ -21,6 +23,8 @@ COPY . .
 RUN npm run prisma:generate
 RUN npm run build
 
+# ✅ Agora sim: produção
+ENV NODE_ENV=production
 RUN npm prune --omit=dev && npm cache clean --force
 RUN test -f /app/dist/src/main.js
 
