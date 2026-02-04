@@ -2,9 +2,12 @@
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
-# Dependências
+# Prisma/openssl (evita warning e runtime quebrado em alguns ambientes)
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
+# Dependências (FORÇA devDependencies no build)
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --include=dev
 
 # Código
 COPY . .
@@ -17,16 +20,15 @@ RUN npm run build
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Copiar apenas o necessário
 COPY --from=builder /app/package.json /app/package-lock.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
-
-# Start
 CMD ["node", "dist/main"]
