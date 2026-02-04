@@ -4,8 +4,8 @@ FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
 RUN apt-get update -y \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+ && apt-get install -y --no-install-recommends openssl ca-certificates curl wget dumb-init \
+ && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
 RUN npm ci --include=dev
