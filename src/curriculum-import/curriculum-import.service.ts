@@ -216,30 +216,37 @@ export class CurriculumImportService {
 
     for (const entry of entries) {
       try {
-        // Upsert usando unique constraint (matrixId, date)
-        const result = await this.prisma.curriculumMatrixEntry.upsert({
+        // Verificar se já existe
+        const existing = await this.prisma.curriculumMatrixEntry.findUnique({
           where: {
             matrixId_date: {
               matrixId: matrix.id,
               date: entry.date,
             },
           },
-          create: {
-            matrixId: matrix.id,
-            date: entry.date,
-            weekOfYear: entry.weekOfYear,
-            dayOfWeek: entry.dayOfWeek,
-            bimester: entry.bimester,
-            campoDeExperiencia: entry.campoDeExperiencia,
-            objetivoBNCC: entry.objetivoBNCC,
-            objetivoBNCCCode: entry.objetivoBNCCCode,
-            objetivoCurriculo: entry.objetivoCurriculo,
-            intencionalidade: entry.intencionalidade,
-            exemploAtividade: entry.exemploAtividade,
-          },
-          update: force
-            ? {
-                // Force: atualiza tudo
+        });
+
+        if (existing) {
+          // Já existe: verificar se há mudanças
+          const hasChanges = this.hasChanges(existing, entry);
+          
+          if (!hasChanges) {
+            // Sem mudanças: não fazer nada
+            unchanged++;
+            continue;
+          }
+
+          // Com mudanças: atualizar apenas se force=true ou campos não-normativos
+          if (force) {
+            // Force: atualiza tudo
+            await this.prisma.curriculumMatrixEntry.update({
+              where: {
+                matrixId_date: {
+                  matrixId: matrix.id,
+                  date: entry.date,
+                },
+              },
+              data: {
                 weekOfYear: entry.weekOfYear,
                 dayOfWeek: entry.dayOfWeek,
                 bimester: entry.bimester,
@@ -249,30 +256,51 @@ export class CurriculumImportService {
                 objetivoCurriculo: entry.objetivoCurriculo,
                 intencionalidade: entry.intencionalidade,
                 exemploAtividade: entry.exemploAtividade,
-              }
-            : {
-                // Sem force: atualiza apenas campos não-normativos
-                intencionalidade: entry.intencionalidade,
-                exemploAtividade: entry.exemploAtividade,
               },
-        });
-
-        // Verificar se foi insert ou update
-        const existing = await this.prisma.curriculumMatrixEntry.findFirst({
-          where: {
-            matrixId: matrix.id,
-            date: entry.date,
-          },
-        });
-
-        if (existing && existing.createdAt.getTime() === existing.updatedAt.getTime()) {
-          inserts++;
-        } else if (existing) {
-          if (this.hasChanges(existing, entry)) {
+            });
             updates++;
           } else {
-            unchanged++;
+            // Sem force: atualiza apenas campos não-normativos se mudaram
+            const nonNormativeChanged = 
+              existing.intencionalidade !== entry.intencionalidade ||
+              existing.exemploAtividade !== entry.exemploAtividade;
+            
+            if (nonNormativeChanged) {
+              await this.prisma.curriculumMatrixEntry.update({
+                where: {
+                  matrixId_date: {
+                    matrixId: matrix.id,
+                    date: entry.date,
+                  },
+                },
+                data: {
+                  intencionalidade: entry.intencionalidade,
+                  exemploAtividade: entry.exemploAtividade,
+                },
+              });
+              updates++;
+            } else {
+              unchanged++;
+            }
           }
+        } else {
+          // Não existe: inserir
+          await this.prisma.curriculumMatrixEntry.create({
+            data: {
+              matrixId: matrix.id,
+              date: entry.date,
+              weekOfYear: entry.weekOfYear,
+              dayOfWeek: entry.dayOfWeek,
+              bimester: entry.bimester,
+              campoDeExperiencia: entry.campoDeExperiencia,
+              objetivoBNCC: entry.objetivoBNCC,
+              objetivoBNCCCode: entry.objetivoBNCCCode,
+              objetivoCurriculo: entry.objetivoCurriculo,
+              intencionalidade: entry.intencionalidade,
+              exemploAtividade: entry.exemploAtividade,
+            },
+          });
+          inserts++;
         }
       } catch (error) {
         // Ignorar erros de unique constraint (já existe)
@@ -287,11 +315,16 @@ export class CurriculumImportService {
    * Verifica se há mudanças entre entrada existente e nova
    */
   private hasChanges(existing: any, entry: ParsedMatrixEntry): boolean {
+    const normalize = (str: string | null | undefined): string => {
+      if (!str) return '';
+      return str.trim().replace(/\s+/g, ' ');
+    };
+
     return (
-      existing.objetivoBNCC !== entry.objetivoBNCC ||
-      existing.objetivoCurriculo !== entry.objetivoCurriculo ||
-      existing.intencionalidade !== entry.intencionalidade ||
-      existing.exemploAtividade !== entry.exemploAtividade
+      normalize(existing.objetivoBNCC) !== normalize(entry.objetivoBNCC) ||
+      normalize(existing.objetivoCurriculo) !== normalize(entry.objetivoCurriculo) ||
+      normalize(existing.intencionalidade) !== normalize(entry.intencionalidade) ||
+      normalize(existing.exemploAtividade) !== normalize(entry.exemploAtividade)
     );
   }
 
