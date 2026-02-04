@@ -1,21 +1,21 @@
-# Node
+# deps
 node_modules
+
+# build output
+dist
+
+# env (nunca vai pra imagem)
+.env
+.env.*
+!.env.example
+
+# logs
 npm-debug.log
 yarn-error.log
 pnpm-debug.log
 
-# Build output
-dist
-
-# VCS
+# VCS / editor / OS
 .git
-.gitignore
-
-# Editor/OS
 .vscode
 .idea
 .DS_Store
-
-# Env (nunca vai pra imagem)
-.env
-.env.*
