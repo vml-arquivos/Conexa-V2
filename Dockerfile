@@ -49,7 +49,10 @@ COPY --from=builder /app/prisma ./prisma
 COPY package.json package-lock.json ./
 
 COPY entrypoint.sh ./entrypoint.sh
+
 RUN chmod +x ./entrypoint.sh
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 3000
 CMD ["./entrypoint.sh"]
