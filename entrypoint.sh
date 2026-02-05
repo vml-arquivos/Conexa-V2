@@ -1,13 +1,54 @@
 #!/usr/bin/env sh
 set -eu
 
+echo "=== Conexa-V2 Entrypoint ==="
+echo "Validando variáveis de ambiente obrigatórias..."
+
+# Validar DATABASE_URL (obrigatória)
 if [ -z "${DATABASE_URL:-}" ]; then
-  echo "ERRO: DATABASE_URL nao definido no runtime (Coolify Environment Variables)."
+  echo "ERRO: DATABASE_URL não definida no runtime."
+  echo "Configure esta variável no Coolify (Environment Variables)."
   exit 1
 fi
 
-echo "Executando prisma migrate deploy (best effort)..."
-npx prisma migrate deploy || echo "Aviso: prisma migrate deploy falhou (best effort). Subindo app mesmo assim."
+# Validar DIRECT_URL (obrigatória para migrations)
+if [ -z "${DIRECT_URL:-}" ]; then
+  echo "ERRO: DIRECT_URL não definida no runtime."
+  echo "Configure esta variável no Coolify (Environment Variables)."
+  exit 1
+fi
 
-echo "Iniciando app usando: /app/dist/src/main.js"
-exec node /app/dist/src/main.js
+echo "✅ Variáveis de ambiente validadas."
+echo ""
+
+# Executar migrations
+echo "Executando prisma migrate deploy..."
+
+if npx prisma migrate deploy; then
+  echo "✅ Migrations aplicadas com sucesso."
+else
+  echo "❌ ERRO: prisma migrate deploy falhou."
+  echo ""
+  echo "Possíveis causas:"
+  echo "  1. IP do servidor não está na whitelist do Supabase"
+  echo "  2. DATABASE_URL ou DIRECT_URL incorretas"
+  echo "  3. Banco de dados inacessível"
+  echo ""
+  echo "Consulte: COOLIFY_SETUP_GUIDE.md para troubleshooting"
+  echo ""
+  
+  # Permitir "best effort" apenas se explicitamente configurado
+  if [ "${MIGRATE_BEST_EFFORT:-false}" = "true" ]; then
+    echo "⚠️  MIGRATE_BEST_EFFORT=true: Subindo app mesmo assim (NÃO RECOMENDADO EM PRODUÇÃO)"
+  else
+    echo "Deploy abortado. Configure MIGRATE_BEST_EFFORT=true para subir mesmo com migrations falhando (não recomendado)."
+    exit 1
+  fi
+fi
+
+echo ""
+echo "Iniciando aplicação NestJS..."
+echo "Path: /app/dist/main.js"
+echo ""
+
+exec node /app/dist/main.js
