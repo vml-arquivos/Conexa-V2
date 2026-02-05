@@ -11,17 +11,10 @@ if [ -z "${DATABASE_URL:-}" ]; then
   exit 1
 fi
 
-# Validar DIRECT_URL (obrigatória para migrations)
-if [ -z "${DIRECT_URL:-}" ]; then
-  echo "ERRO: DIRECT_URL não definida no runtime."
-  echo "Configure esta variável no Coolify (Environment Variables)."
-  exit 1
-fi
-
 echo "✅ Variáveis de ambiente validadas."
 echo ""
 
-# Executar migrations
+# Executar migrations (usando DATABASE_URL)
 echo "Executando prisma migrate deploy..."
 
 if npx prisma migrate deploy; then
@@ -30,13 +23,13 @@ else
   echo "❌ ERRO: prisma migrate deploy falhou."
   echo ""
   echo "Possíveis causas:"
-  echo "  1. IP do servidor não está na whitelist do Supabase"
-  echo "  2. DATABASE_URL ou DIRECT_URL incorretas"
-  echo "  3. Banco de dados inacessível"
+  echo "  1. DATABASE_URL incorreta"
+  echo "  2. Banco de dados inacessível"
+  echo "  3. Limitação do pooler (transaction mode pode falhar em alguns DDL)"
   echo ""
   echo "Consulte: COOLIFY_SETUP_GUIDE.md para troubleshooting"
   echo ""
-  
+
   # Permitir "best effort" apenas se explicitamente configurado
   if [ "${MIGRATE_BEST_EFFORT:-false}" = "true" ]; then
     echo "⚠️  MIGRATE_BEST_EFFORT=true: Subindo app mesmo assim (NÃO RECOMENDADO EM PRODUÇÃO)"
