@@ -5,7 +5,25 @@ import { PrismaService } from '../prisma/prisma.service';
 export class HealthService {
   constructor(private prisma: PrismaService) {}
 
-  async check() {
+  /**
+   * Health check - NÃO depende do banco de dados
+   * Usado pelo Coolify para verificar se o container está vivo
+   * Retorna sempre 200 OK se o app está rodando
+   */
+  check() {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    };
+  }
+
+  /**
+   * Readiness check - DEPENDE do banco de dados
+   * Usado para verificar se o app está pronto para receber tráfego
+   * Retorna 503 se o banco estiver inacessível
+   */
+  async ready() {
     const timestamp = new Date().toISOString();
 
     try {
@@ -13,14 +31,15 @@ export class HealthService {
       await this.prisma.$queryRaw`SELECT 1`;
 
       return {
-        status: 'ok',
+        status: 'ready',
         database: 'up',
         timestamp,
       };
     } catch (error) {
       throw new ServiceUnavailableException({
-        status: 'error',
+        status: 'not_ready',
         database: 'down',
+        error: error.message,
         timestamp,
       });
     }
