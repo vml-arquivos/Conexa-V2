@@ -41,7 +41,8 @@ fi
 
 echo ""
 echo "Iniciando aplicação NestJS..."
-echo "Path: /app/dist/main.js"
+echo "Path: node /app/dist/src/main.js"
 echo ""
 
-exec node /app/dist/main.js
+exec node /app/dist/src/main.js
+
