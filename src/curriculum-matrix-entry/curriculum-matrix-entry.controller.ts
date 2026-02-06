@@ -15,12 +15,13 @@ import { UpdateCurriculumMatrixEntryDto } from './dto/update-curriculum-matrix-e
 import { QueryCurriculumMatrixEntryDto } from './dto/query-curriculum-matrix-entry.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { ScopeGuard } from '../common/guards/scope.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequireRoles } from '../common/decorators/roles.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 @Controller('curriculum-matrix-entries')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ScopeGuard)
 export class CurriculumMatrixEntryController {
   constructor(
     private readonly curriculumMatrixEntryService: CurriculumMatrixEntryService,

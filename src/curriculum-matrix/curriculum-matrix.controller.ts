@@ -15,12 +15,13 @@ import { UpdateCurriculumMatrixDto } from './dto/update-curriculum-matrix.dto';
 import { QueryCurriculumMatrixDto } from './dto/query-curriculum-matrix.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { ScopeGuard } from '../common/guards/scope.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequireRoles } from '../common/decorators/roles.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 @Controller('curriculum-matrices')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ScopeGuard)
 export class CurriculumMatrixController {
   constructor(private readonly curriculumMatrixService: CurriculumMatrixService) {}
 

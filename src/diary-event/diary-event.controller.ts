@@ -16,11 +16,13 @@ import { CreateDiaryEventDto } from './dto/create-diary-event.dto';
 import { UpdateDiaryEventDto } from './dto/update-diary-event.dto';
 import { QueryDiaryEventDto } from './dto/query-diary-event.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { ScopeGuard } from '../common/guards/scope.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 @Controller('diary-events')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ScopeGuard)
 export class DiaryEventController {
   constructor(private readonly diaryEventService: DiaryEventService) {}
 

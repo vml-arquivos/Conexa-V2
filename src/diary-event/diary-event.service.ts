@@ -16,6 +16,7 @@ import {
   isSamePedagogicalDay,
   formatPedagogicalDate,
 } from '../common/utils/date.utils';
+import { getScopedWhereForDiaryEvent } from './diary-event-scope.helper';
 
 @Injectable()
 export class DiaryEventService {
@@ -301,8 +302,13 @@ export class DiaryEventService {
    * Busca um evento por ID
    */
   async findOne(id: string, user: JwtPayload) {
-    const event = await this.prisma.diaryEvent.findUnique({
-      where: { id },
+    const scopedWhere = getScopedWhereForDiaryEvent(user);
+
+    const event = await this.prisma.diaryEvent.findFirst({
+      where: {
+        id,
+        ...scopedWhere,
+      },
       include: {
         child: {
           select: {
@@ -341,8 +347,20 @@ export class DiaryEventService {
       throw new NotFoundException('Evento não encontrado');
     }
 
-    // Validar acesso
-    await this.validateAccess(event, user);
+    // Para PROFESSOR, validar se é professor da turma
+    if (user.roles.some((role) => role.level === RoleLevel.PROFESSOR)) {
+      const isTeacher = await this.prisma.classroomTeacher.findFirst({
+        where: {
+          classroomId: event.classroomId,
+          teacherId: user.sub,
+          isActive: true,
+        },
+      });
+
+      if (!isTeacher) {
+        throw new NotFoundException('Evento não encontrado');
+      }
+    }
 
     return event;
   }
@@ -351,19 +369,8 @@ export class DiaryEventService {
    * Atualiza um evento
    */
   async update(id: string, updateDto: UpdateDiaryEventDto, user: JwtPayload) {
-    const event = await this.prisma.diaryEvent.findUnique({
-      where: { id },
-      include: {
-        classroom: true,
-      },
-    });
-
-    if (!event) {
-      throw new NotFoundException('Evento não encontrado');
-    }
-
-    // Validar acesso
-    await this.validateAccess(event, user);
+    // Buscar evento com escopo
+    const event = await this.findOne(id, user);
 
     // Apenas o criador ou níveis superiores podem editar
     const canEdit =
@@ -438,19 +445,8 @@ export class DiaryEventService {
    * Remove um evento (soft delete)
    */
   async remove(id: string, user: JwtPayload) {
-    const event = await this.prisma.diaryEvent.findUnique({
-      where: { id },
-      include: {
-        classroom: true,
-      },
-    });
-
-    if (!event) {
-      throw new NotFoundException('Evento não encontrado');
-    }
-
-    // Validar acesso
-    await this.validateAccess(event, user);
+    // Buscar evento com escopo
+    const event = await this.findOne(id, user);
 
     // Apenas o criador ou níveis superiores podem deletar
     const canDelete =
