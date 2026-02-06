@@ -1,43 +1,31 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: ['log', 'error', 'warn'],
-  });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Importante para Traefik / Coolify
+  // trust proxy (necessário quando está atrás do Traefik/Coolify)
   app.set('trust proxy', 1);
 
-  // Validação global (correto e seguro)
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      stopAtFirstError: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
     }),
   );
 
-  // CORS simples e funcional (igual ao que já está rodando)
   app.enableCors({
-    origin: '*', // você já validou que funciona
-    allowedHeaders: 'Content-Type, Authorization',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    origin: true,
+    credentials: true,
   });
 
-  const port = Number(process.env.PORT ?? 3000);
-  const host = process.env.HOST ?? '0.0.0.0';
+  const port = Number(process.env.PORT) || 3000;
+  await app.listen(port, '0.0.0.0');
 
-  await app.listen(port, host);
-  console.log(`🚀 Conexa API rodando em http://${host}:${port}`);
+  console.log(`🚀 Conexa API rodando em http://0.0.0.0:${port}`);
 }
 
-bootstrap().catch((err) => {
-  console.error('❌ Erro ao iniciar aplicação:', err);
-  process.exit(1);
-});
+bootstrap();
