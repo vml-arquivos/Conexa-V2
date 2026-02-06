@@ -12,6 +12,7 @@ import { UpdatePlanningDto } from './dto/update-planning.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { QueryPlanningDto } from './dto/query-planning.dto';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { getScopedWhereForPlanning } from './planning-scope.helper';
 import { RoleLevel, PlanningStatus, AuditLogAction } from '@prisma/client';
 
 @Injectable()
@@ -277,8 +278,13 @@ export class PlanningService {
    * Busca um planejamento por ID
    */
   async findOne(id: string, user: JwtPayload) {
-    const planning = await this.prisma.planning.findUnique({
-      where: { id },
+    const scopedWhere = getScopedWhereForPlanning(user);
+
+    const planning = await this.prisma.planning.findFirst({
+      where: {
+        id,
+        ...scopedWhere,
+      },
       include: {
         template: true,
         classroom: true,
@@ -302,8 +308,20 @@ export class PlanningService {
       throw new NotFoundException('Planejamento não encontrado');
     }
 
-    // Validar acesso
-    await this.validateAccess(planning, user);
+    // Para PROFESSOR, validar se é professor da turma
+    if (user.roles.some((role) => role.level === RoleLevel.PROFESSOR)) {
+      const isTeacher = await this.prisma.classroomTeacher.findFirst({
+        where: {
+          classroomId: planning.classroomId,
+          teacherId: user.sub,
+          isActive: true,
+        },
+      });
+
+      if (!isTeacher) {
+        throw new NotFoundException('Planejamento não encontrado');
+      }
+    }
 
     return planning;
   }
@@ -312,19 +330,8 @@ export class PlanningService {
    * Atualiza um planejamento
    */
   async update(id: string, updateDto: UpdatePlanningDto, user: JwtPayload) {
-    const planning = await this.prisma.planning.findUnique({
-      where: { id },
-      include: {
-        classroom: true,
-      },
-    });
-
-    if (!planning) {
-      throw new NotFoundException('Planejamento não encontrado');
-    }
-
-    // Validar acesso
-    await this.validateAccess(planning, user);
+    // Buscar planejamento com escopo
+    const planning = await this.findOne(id, user);
 
     // Validar se pode editar
     if (planning.status === PlanningStatus.CONCLUIDO) {
@@ -404,19 +411,8 @@ export class PlanningService {
     changeStatusDto: ChangeStatusDto,
     user: JwtPayload,
   ) {
-    const planning = await this.prisma.planning.findUnique({
-      where: { id },
-      include: {
-        classroom: true,
-      },
-    });
-
-    if (!planning) {
-      throw new NotFoundException('Planejamento não encontrado');
-    }
-
-    // Validar acesso
-    await this.validateAccess(planning, user);
+    // Buscar planejamento com escopo
+    const planning = await this.findOne(id, user);
 
     // Validar transição de status
     this.validateStatusTransition(planning.status, changeStatusDto.status);
@@ -500,19 +496,8 @@ export class PlanningService {
    * Fecha um planejamento (EM_EXECUCAO → CONCLUIDO)
    */
   async close(id: string, user: JwtPayload) {
-    const planning = await this.prisma.planning.findUnique({
-      where: { id },
-      include: {
-        classroom: true,
-      },
-    });
-
-    if (!planning) {
-      throw new NotFoundException('Planejamento não encontrado');
-    }
-
-    // Validar acesso
-    await this.validateAccess(planning, user);
+    // Buscar planejamento com escopo
+    const planning = await this.findOne(id, user);
 
     // Validar RBAC: Professor não pode fechar
     if (user.roles.some((role) => role.level === RoleLevel.PROFESSOR)) {

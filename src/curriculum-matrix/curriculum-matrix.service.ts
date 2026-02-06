@@ -116,8 +116,11 @@ export class CurriculumMatrixService {
   async findOne(id: string, user: JwtPayload) {
     await this.validateAccess(user);
 
-    const matrix = await this.prisma.curriculumMatrix.findUnique({
-      where: { id },
+    const matrix = await this.prisma.curriculumMatrix.findFirst({
+      where: {
+        id,
+        mantenedoraId: user.roles[0]?.level === 'DEVELOPER' ? undefined : user.mantenedoraId,
+      },
       include: {
         entries: {
           orderBy: { date: 'asc' },
@@ -130,10 +133,6 @@ export class CurriculumMatrixService {
 
     if (!matrix) {
       throw new NotFoundException('Matriz curricular não encontrada');
-    }
-
-    if (matrix.mantenedoraId !== user.mantenedoraId && user.roles[0]?.level !== 'DEVELOPER') {
-      throw new ForbiddenException('Acesso negado a esta matriz');
     }
 
     return matrix;
