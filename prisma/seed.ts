@@ -1,4 +1,5 @@
 import { PrismaClient, RoleLevel, RoleType, UserStatus, PlanningStatus, PlanningType } from '@prisma/client';
+import { matrixDataEI02 } from './seeds/data/matrix-2026-ei02';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -239,6 +240,9 @@ async function main() {
   });
   console.log('✅ Planning created:', planning.id, '(status: EM_EXECUCAO)');
 
+  // 8. Seed Matriz Curricular EI02 2026
+  await seedMatrixEI02_2026(prisma, MANTENEDORA_ID, developer.id);
+
   console.log('\n🎉 Seed completed successfully!\n');
   console.log('📋 CREDENTIALS:');
   console.log('   Email: developer@conexa.local | coordenador@conexa.local | professor@conexa.local');
@@ -250,6 +254,110 @@ async function main() {
   console.log(`   curriculumMatrixId: ${CURRICULUM_MATRIX_ID}`);
   console.log(`   planningId: ${PLANNING_ID}\n`);
   console.log('🔑 Next step: Login via POST /auth/login to obtain JWT tokens');
+}
+
+/**
+ * Seed da Matriz Curricular EI02 2026 (idempotente)
+ */
+async function seedMatrixEI02_2026(prisma: PrismaClient, mantenedoraId: string, createdBy: string) {
+  console.log('\n📚 Seeding Matriz Curricular EI02 2026...');
+
+  // Upsert Mantenedora (usando CNPJ como chave única)
+  const mantenedora = await prisma.mantenedora.upsert({
+    where: { cnpj: '00.000.000/0001-00' },
+    update: {},
+    create: {
+      name: 'Mantenedora Padrão',
+      cnpj: '00.000.000/0001-00',
+      email: 'contato@mantenedora.local',
+      phone: '6133334444',
+      isActive: true,
+    },
+  });
+
+  // Upsert CurriculumMatrix (usando chave composta única)
+  const matrix = await prisma.curriculumMatrix.upsert({
+    where: {
+      mantenedoraId_year_segment_version: {
+        mantenedoraId: mantenedora.id,
+        year: matrixDataEI02.matrix.year,
+        segment: matrixDataEI02.matrix.segment,
+        version: matrixDataEI02.matrix.version,
+      },
+    },
+    update: {
+      name: matrixDataEI02.matrix.name,
+      description: matrixDataEI02.matrix.description,
+      sourceUrl: matrixDataEI02.matrix.sourceUrl,
+    },
+    create: {
+      mantenedoraId: mantenedora.id,
+      name: matrixDataEI02.matrix.name,
+      year: matrixDataEI02.matrix.year,
+      segment: matrixDataEI02.matrix.segment,
+      version: matrixDataEI02.matrix.version,
+      description: matrixDataEI02.matrix.description,
+      sourceUrl: matrixDataEI02.matrix.sourceUrl,
+      isActive: true,
+      createdBy,
+    },
+  });
+
+  console.log(`✅ Matriz EI02 upserted: ${matrix.id}`);
+
+  // Upsert CurriculumMatrixEntries (usando chave composta matrixId + date)
+  let entriesCreated = 0;
+  let entriesUpdated = 0;
+
+  for (const entry of matrixDataEI02.entries) {
+    const entryDate = new Date(entry.date);
+
+    const result = await prisma.curriculumMatrixEntry.upsert({
+      where: {
+        matrixId_date: {
+          matrixId: matrix.id,
+          date: entryDate,
+        },
+      },
+      update: {
+        weekOfYear: entry.weekOfYear,
+        dayOfWeek: entry.dayOfWeek,
+        bimester: entry.bimester,
+        campoDeExperiencia: entry.campoDeExperiencia,
+        objetivoBNCC: entry.objetivoBNCC,
+        objetivoBNCCCode: entry.objetivoBNCCCode,
+        objetivoCurriculo: entry.objetivoCurriculo,
+        intencionalidade: entry.intencionalidade,
+        exemploAtividade: entry.exemploAtividade,
+      },
+      create: {
+        matrixId: matrix.id,
+        date: entryDate,
+        weekOfYear: entry.weekOfYear,
+        dayOfWeek: entry.dayOfWeek,
+        bimester: entry.bimester,
+        campoDeExperiencia: entry.campoDeExperiencia,
+        objetivoBNCC: entry.objetivoBNCC,
+        objetivoBNCCCode: entry.objetivoBNCCCode,
+        objetivoCurriculo: entry.objetivoCurriculo,
+        intencionalidade: entry.intencionalidade,
+        exemploAtividade: entry.exemploAtividade,
+      },
+    });
+
+    // Verificar se foi criado ou atualizado (Prisma não retorna essa info diretamente)
+    // Contamos todos como processados
+    entriesCreated++;
+  }
+
+  console.log(`✅ Matriz EI02 upserted with ${matrixDataEI02.entries.length} entries`);
+
+  // Verificar contagem no banco
+  const totalEntries = await prisma.curriculumMatrixEntry.count({
+    where: { matrixId: matrix.id },
+  });
+
+  console.log(`📊 Total entries in database for matrix ${matrix.id}: ${totalEntries}`);
 }
 
 main()
