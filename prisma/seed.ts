@@ -269,7 +269,7 @@ async function seedMatrixEI02_2026(prisma: PrismaClient, mantenedoraId: string, 
     create: {
       name: 'Mantenedora Padrão',
       cnpj: '00.000.000/0001-00',
-      email: 'contato@mantenedora.local',
+      email: 'seed@mantenedora.local',
       phone: '6133334444',
       isActive: true,
     },
@@ -280,24 +280,20 @@ async function seedMatrixEI02_2026(prisma: PrismaClient, mantenedoraId: string, 
     where: {
       mantenedoraId_year_segment_version: {
         mantenedoraId: mantenedora.id,
-        year: matrixDataEI02.matrix.year,
-        segment: matrixDataEI02.matrix.segment,
-        version: matrixDataEI02.matrix.version,
+        year: matrixDataEI02.year,
+        segment: matrixDataEI02.segment,
+        version: 1, // default
       },
     },
     update: {
-      name: matrixDataEI02.matrix.name,
-      description: matrixDataEI02.matrix.description,
-      sourceUrl: matrixDataEI02.matrix.sourceUrl,
+      name: matrixDataEI02.name,
     },
     create: {
       mantenedoraId: mantenedora.id,
-      name: matrixDataEI02.matrix.name,
-      year: matrixDataEI02.matrix.year,
-      segment: matrixDataEI02.matrix.segment,
-      version: matrixDataEI02.matrix.version,
-      description: matrixDataEI02.matrix.description,
-      sourceUrl: matrixDataEI02.matrix.sourceUrl,
+      name: matrixDataEI02.name,
+      year: matrixDataEI02.year,
+      segment: matrixDataEI02.segment,
+      version: 1,
       isActive: true,
       createdBy,
     },
@@ -305,14 +301,39 @@ async function seedMatrixEI02_2026(prisma: PrismaClient, mantenedoraId: string, 
 
   console.log(`✅ Matriz EI02 upserted: ${matrix.id}`);
 
-  // Upsert CurriculumMatrixEntries (usando chave composta matrixId + date)
-  let entriesCreated = 0;
-  let entriesUpdated = 0;
+  // Limpeza controlada: deletar entries do seed errado anterior (jan/2026)
+  const oldDates = [
+    new Date('2026-01-06T00:00:00Z'),
+    new Date('2026-01-07T00:00:00Z'),
+    new Date('2026-01-08T00:00:00Z'),
+    new Date('2026-01-09T00:00:00Z'),
+    new Date('2026-01-10T00:00:00Z'),
+  ];
+
+  const deletedCount = await prisma.curriculumMatrixEntry.deleteMany({
+    where: {
+      matrixId: matrix.id,
+      date: { in: oldDates },
+    },
+  });
+
+  if (deletedCount.count > 0) {
+    console.log(`🗑️  Deleted ${deletedCount.count} old entries (jan/2026)`);
+  }
+
+  // Upsert CurriculumMatrixEntries (fev/2026)
+  const insertedDates: string[] = [];
+  const insertedCodes: string[] = [];
 
   for (const entry of matrixDataEI02.entries) {
     const entryDate = new Date(entry.date);
+    
+    // Calcular dayOfWeek (UTC): 0=Dom, 1=Seg, ..., 6=Sáb
+    // Para o schema, precisamos: 1=Seg, 2=Ter, ..., 5=Sex
+    const utcDay = entryDate.getUTCDay();
+    const dayOfWeek = utcDay === 0 ? 7 : utcDay; // Converter domingo (0) para 7
 
-    const result = await prisma.curriculumMatrixEntry.upsert({
+    await prisma.curriculumMatrixEntry.upsert({
       where: {
         matrixId_date: {
           matrixId: matrix.id,
@@ -320,37 +341,34 @@ async function seedMatrixEI02_2026(prisma: PrismaClient, mantenedoraId: string, 
         },
       },
       update: {
-        weekOfYear: entry.weekOfYear,
-        dayOfWeek: entry.dayOfWeek,
-        bimester: entry.bimester,
-        campoDeExperiencia: entry.campoDeExperiencia,
-        objetivoBNCC: entry.objetivoBNCC,
-        objetivoBNCCCode: entry.objetivoBNCCCode,
-        objetivoCurriculo: entry.objetivoCurriculo,
+        weekOfYear: entry.week,
+        dayOfWeek: dayOfWeek,
+        campoDeExperiencia: entry.campo,
+        objetivoBNCC: entry.bncc,
+        objetivoBNCCCode: entry.code,
+        objetivoCurriculo: entry.curriculo,
         intencionalidade: entry.intencionalidade,
-        exemploAtividade: entry.exemploAtividade,
       },
       create: {
         matrixId: matrix.id,
         date: entryDate,
-        weekOfYear: entry.weekOfYear,
-        dayOfWeek: entry.dayOfWeek,
-        bimester: entry.bimester,
-        campoDeExperiencia: entry.campoDeExperiencia,
-        objetivoBNCC: entry.objetivoBNCC,
-        objetivoBNCCCode: entry.objetivoBNCCCode,
-        objetivoCurriculo: entry.objetivoCurriculo,
+        weekOfYear: entry.week,
+        dayOfWeek: dayOfWeek,
+        campoDeExperiencia: entry.campo,
+        objetivoBNCC: entry.bncc,
+        objetivoBNCCCode: entry.code,
+        objetivoCurriculo: entry.curriculo,
         intencionalidade: entry.intencionalidade,
-        exemploAtividade: entry.exemploAtividade,
       },
     });
 
-    // Verificar se foi criado ou atualizado (Prisma não retorna essa info diretamente)
-    // Contamos todos como processados
-    entriesCreated++;
+    insertedDates.push(entry.date);
+    insertedCodes.push(entry.code);
   }
 
-  console.log(`✅ Matriz EI02 upserted with ${matrixDataEI02.entries.length} entries`);
+  console.log(`✅ Matriz EI02 upserted with 5 entries`);
+  console.log(`📅 Datas inseridas: ${insertedDates.join(', ')}`);
+  console.log(`🔖 Códigos inseridos: ${insertedCodes.join(', ')}`);
 
   // Verificar contagem no banco
   const totalEntries = await prisma.curriculumMatrixEntry.count({
