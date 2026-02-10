@@ -10,6 +10,9 @@ export class TenantCacheInterceptor extends CacheInterceptor {
     const http = context.switchToHttp();
     const req = http.getRequest();
 
+    if (req?.__cacheKey) return req.__cacheKey;
+
+
     // CacheInterceptor base gera key pela URL (path + query)
     const baseKey = super.trackBy(context);
     if (!baseKey) return baseKey;

@@ -315,6 +315,8 @@ model Unit {
   @@unique([mantenedoraId, code])
   @@index([mantenedoraId])
   @@index([isActive])
+
+  dailyMetrics DailyMetric[]
 }
 
 // ============================================================================
@@ -1133,3 +1135,24 @@ model AIContext {
 // ============================================================================
 // FIM DO SCHEMA v1.1
 // ============================================================================
+
+enum DailyMetricType {
+  DIARY
+  ACCESS
+}
+
+model DailyMetric {
+  id        String          @id @default(cuid())
+  unitId    String
+  date      DateTime
+  type      DailyMetricType
+  count     Int             @default(0)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  unit      Unit            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, date, type])
+  @@index([unitId, date])
+  @@index([type, date])
+}

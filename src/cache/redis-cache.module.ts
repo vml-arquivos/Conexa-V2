@@ -1,8 +1,11 @@
-import { Module, Logger } from '@nestjs/common';
+import { Global, Logger, Module } from '@nestjs/common';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
 import { TenantCacheInterceptor } from './tenant-cache.interceptor';
+import { MatrixCacheInvalidationService } from './matrix-cache-invalidation.service';
+import { MatrixCacheInterceptor } from './matrix-cache.interceptor';
 
+@Global()
 @Module({
   imports: [
     CacheModule.registerAsync({
@@ -11,23 +14,26 @@ import { TenantCacheInterceptor } from './tenant-cache.interceptor';
         const logger = new Logger('RedisCache');
         const url = process.env.REDIS_URL;
 
-        // Em prod: definir REDIS_URL no Coolify.
-        // Em dev/test: fallback em memória para não quebrar.
         if (!url) {
           logger.warn('REDIS_URL ausente — usando cache em memória (dev/test).');
-          return { ttl: 300 }; // default 5 min
+          return { ttl: 300 };
         }
 
         const store = await redisStore({ url });
         logger.log('Redis cache store habilitado.');
-        return {
-          store,
-          ttl: 300, // default 5 min
-        };
+        return { store, ttl: 300 };
       },
     }),
   ],
-  providers: [TenantCacheInterceptor],
-  exports: [TenantCacheInterceptor],
+  providers: [
+    TenantCacheInterceptor,
+    MatrixCacheInvalidationService,
+    MatrixCacheInterceptor,
+  ],
+  exports: [
+    TenantCacheInterceptor,
+    MatrixCacheInvalidationService,
+    MatrixCacheInterceptor,
+  ],
 })
 export class RedisCacheModule {}
