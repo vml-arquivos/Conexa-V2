@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
+import { RedisCacheModule } from './cache/redis-cache.module';
 import { AuthModule } from './auth/auth.module';
 import { ExampleModule } from './example/example.module';
 import { DiaryEventModule } from './diary-event/diary-event.module';
