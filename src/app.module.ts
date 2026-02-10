@@ -17,6 +17,7 @@ import { CurriculumMatrixEntryModule } from './curriculum-matrix-entry/curriculu
 import { CurriculumImportModule } from './curriculum-import/curriculum-import.module';
 import { HealthModule } from './health/health.module';
 import { ReportsModule } from './reports/reports.module';
+import { MaterialRequestModule } from './material-request/material-request.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
@@ -36,6 +37,9 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     CurriculumImportModule,
     HealthModule,
     ReportsModule,
+    RedisCacheModule,
+    MetricsModule,
+    MaterialRequestModule,
   ],
   controllers: [AppController],
   providers: [
