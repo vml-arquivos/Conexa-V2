@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MatrixCacheInvalidationService } from '../cache/matrix-cache-invalidation.service';
 import { AuditService } from '../common/services/audit.service';
 import { CreateCurriculumMatrixDto } from './dto/create-curriculum-matrix.dto';
 import { UpdateCurriculumMatrixDto } from './dto/update-curriculum-matrix.dto';
@@ -16,7 +17,11 @@ export class CurriculumMatrixService {
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
-  ) {}
+  
+    private readonly matrixCacheInvalidation: MatrixCacheInvalidationService,
+  
+) {}
+
 
   /**
    * Criar uma nova Matriz Curricular
@@ -186,6 +191,8 @@ export class CurriculumMatrixService {
       mantenedoraId: user.mantenedoraId,
       changes: { before: matrix, after: updated },
     });
+
+    await this.matrixCacheInvalidation.bump(user.mantenedoraId);
 
     return updated;
   }

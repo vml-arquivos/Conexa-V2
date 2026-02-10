@@ -1,8 +1,28 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  constructor(private readonly eventEmitter: EventEmitter2) {
+    super();
+
+    this.$use(async (params, next) => {
+      const result = await next(params);
+
+      if (params.model === 'DiaryEvent' && params.action === 'create') {
+        try {
+          const r = result as any;
+          if (r?.unitId && r?.eventDate) {
+            this.eventEmitter.emit('diary.created', { unitId: r.unitId, eventDate: r.eventDate });
+          }
+        } catch {}
+      }
+
+      return result;
+    });
+  }
+
   private readonly logger = new Logger(PrismaService.name);
 
   async onModuleInit(): Promise<void> {

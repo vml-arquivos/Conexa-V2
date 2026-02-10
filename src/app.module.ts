@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
+import { MetricsModule } from './metrics/metrics.module';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
+import { RedisCacheModule } from './cache/redis-cache.module';
 import { AuthModule } from './auth/auth.module';
 import { ExampleModule } from './example/example.module';
 import { DiaryEventModule } from './diary-event/diary-event.module';
@@ -18,7 +21,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
+    EventEmitterModule.forRoot({ global: true }), ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
     }),
