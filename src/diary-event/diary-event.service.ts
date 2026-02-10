@@ -10,7 +10,7 @@ import { CreateDiaryEventDto } from './dto/create-diary-event.dto';
 import { UpdateDiaryEventDto } from './dto/update-diary-event.dto';
 import { QueryDiaryEventDto } from './dto/query-diary-event.dto';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { RoleLevel, PlanningStatus } from '@prisma/client';
+import { RoleLevel, PlanningStatus, AuditLogEntity } from '@prisma/client';
 import {
   getPedagogicalDay,
   isSamePedagogicalDay,
@@ -27,8 +27,26 @@ export class DiaryEventService {
 
   /**
    * Cria um novo evento no diário de bordo
+   * Travas (Sprint 1):
+   * - Não permitir datas futuras (dia pedagógico - America/Sao_Paulo)
+   * - Bloquear retroatividade sem planejamento aprovado
+   * - eventDate deve coincidir com CurriculumMatrixEntry.date (dia pedagógico)
+   * - Segmento (EI01/EI02/EI03) compatível com CurriculumMatrix.segment
+   * - Auditoria automática (DIARY_EVENT / CREATE)
    */
   async create(createDto: CreateDiaryEventDto, user: JwtPayload) {
+    // Normalizar datas por "dia pedagógico" (America/Sao_Paulo)
+    const eventDate = new Date(createDto.eventDate);
+    const todayPed = getPedagogicalDay(new Date());
+    const eventPed = getPedagogicalDay(eventDate);
+
+    // TRAVA: Bloquear datas futuras
+    if (eventPed > todayPed) {
+      throw new BadRequestException(
+        `Não é permitido registrar eventos em datas futuras (${formatPedagogicalDate(eventDate)}).`,
+      );
+    }
+
     // Validar se a criança existe e pertence à turma
     const child = await this.prisma.child.findUnique({
       where: { id: createDto.childId },
@@ -47,9 +65,7 @@ export class DiaryEventService {
     }
 
     if (child.enrollments.length === 0) {
-      throw new BadRequestException(
-        'Criança não está matriculada nesta turma',
-      );
+      throw new BadRequestException('Criança não está matriculada nesta turma');
     }
 
     // Validar se a turma existe
@@ -72,7 +88,7 @@ export class DiaryEventService {
     // HARDENING: Validação explícita de acesso por nível hierárquico
     await this.validateUserAccess(user, classroom);
 
-    // VALIDAÇÃO CRÍTICA 1: Validar Planning obrigatório
+    // VALIDAÇÃO CRÍTICA 1: Planning obrigatório
     const planning = await this.prisma.planning.findUnique({
       where: { id: createDto.planningId },
       include: {
@@ -85,34 +101,47 @@ export class DiaryEventService {
       throw new NotFoundException('Planejamento não encontrado');
     }
 
-    // VALIDAÇÃO CRÍTICA 2: Planning deve estar EM_EXECUCAO
-    if (planning.status !== PlanningStatus.EM_EXECUCAO) {
-      throw new BadRequestException(
-        `Apenas planejamentos ativos podem receber eventos. Status atual: ${planning.status}`,
-      );
+    // TRAVA retroatividade (datas passadas exigem planejamento aprovado; hoje exige execução)
+    if (planning.status === PlanningStatus.CANCELADO) {
+      throw new BadRequestException('Planejamento cancelado não pode receber eventos');
     }
 
-    // Planning type não existe mais no schema
+    if (eventPed < todayPed) {
+      const approvedStatuses: PlanningStatus[] = [
+        PlanningStatus.PUBLICADO,
+        PlanningStatus.EM_EXECUCAO,
+        PlanningStatus.CONCLUIDO,
+      ];
+      if (!approvedStatuses.includes(planning.status)) {
+        throw new BadRequestException(
+          `Registro retroativo bloqueado: ${formatPedagogicalDate(eventDate)} requer planejamento aprovado. Status atual: ${planning.status}`,
+        );
+      }
+    } else {
+      // Hoje: exige planejamento em execução (ativo)
+      if (planning.status !== PlanningStatus.EM_EXECUCAO) {
+        throw new BadRequestException(
+          `Apenas planejamentos ativos podem receber eventos. Status atual: ${planning.status}`,
+        );
+      }
+    }
 
-    // VALIDAÇÃO CRÍTICA 4: Data do evento deve estar dentro do período do Planning
-    const eventDate = new Date(createDto.eventDate);
+    // VALIDAÇÃO CRÍTICA 2: Data do evento dentro do período do Planning
     const planningStart = new Date(planning.startDate);
     const planningEnd = new Date(planning.endDate);
 
     if (eventDate < planningStart || eventDate > planningEnd) {
       throw new BadRequestException(
-        `A data do evento (${eventDate.toLocaleDateString()}) deve estar dentro do período do planejamento (${planningStart.toLocaleDateString()} - ${planningEnd.toLocaleDateString()})`,
+        `A data do evento (${formatPedagogicalDate(eventDate)}) deve estar dentro do período do planejamento (${formatPedagogicalDate(planningStart)} - ${formatPedagogicalDate(planningEnd)})`,
       );
     }
 
-    // VALIDAÇÃO CRÍTICA 5: Planning deve pertencer à mesma turma
+    // VALIDAÇÃO CRÍTICA 3: Planning deve pertencer à mesma turma
     if (planning.classroomId !== createDto.classroomId) {
-      throw new BadRequestException(
-        'O planejamento não pertence à turma informada',
-      );
+      throw new BadRequestException('O planejamento não pertence à turma informada');
     }
 
-    // VALIDAÇÃO CRÍTICA 6: Validar CurriculumEntry obrigatório
+    // VALIDAÇÃO CRÍTICA 4: CurriculumEntry obrigatório
     const entry = await this.prisma.curriculumMatrixEntry.findUnique({
       where: { id: createDto.curriculumEntryId },
       include: { matrix: true },
@@ -122,20 +151,38 @@ export class DiaryEventService {
       throw new NotFoundException('Entrada da matriz curricular não encontrada');
     }
 
-    // VALIDAÇÃO CRÍTICA 7: Data do evento deve corresponder à data da entrada
-    // PADRONIZAÇÃO DE TIMEZONE: Comparar "dia pedagógico" no fuso America/Sao_Paulo
+    // VALIDAÇÃO CRÍTICA 5: Data do evento deve corresponder à data da entrada (dia pedagógico)
     const entryDate = new Date(entry.date);
-    
     if (!isSamePedagogicalDay(eventDate, entryDate)) {
       throw new BadRequestException(
         `A data do evento (${formatPedagogicalDate(eventDate)}) não corresponde à data da entrada da matriz (${formatPedagogicalDate(entryDate)})`,
       );
     }
 
-    // VALIDAÇÃO CRÍTICA 8: CurriculumEntry deve pertencer à matriz do Planning
+    // VALIDAÇÃO CRÍTICA 6: CurriculumEntry deve pertencer à matriz do Planning (quando aplicável)
     if (planning.curriculumMatrixId && entry.matrixId !== planning.curriculumMatrixId) {
       throw new BadRequestException(
         'A entrada da matriz não pertence à matriz curricular do planejamento',
+      );
+    }
+
+    // VALIDAÇÃO CRÍTICA 7: Segmento (Turma/Idade) compatível com a matriz (EI01/EI02/EI03)
+    const ageMonths = this.diffInMonths(child.dateOfBirth, eventDate);
+    if (ageMonths < classroom.ageGroupMin || ageMonths > classroom.ageGroupMax) {
+      throw new BadRequestException(
+        `Segmento incompatível: criança com ${ageMonths} meses fora do intervalo da turma (${classroom.ageGroupMin}-${classroom.ageGroupMax} meses).`,
+      );
+    }
+
+    const expectedSegment = this.inferSegmentFromClassroom(
+      classroom.ageGroupMin,
+      classroom.ageGroupMax,
+    );
+    const matrixSegment = String(entry.matrix.segment || '').toUpperCase();
+
+    if (matrixSegment && matrixSegment !== expectedSegment) {
+      throw new BadRequestException(
+        `Segmento incompatível: turma=${expectedSegment} mas matriz=${matrixSegment}.`,
       );
     }
 
@@ -145,11 +192,17 @@ export class DiaryEventService {
         type: createDto.type,
         title: createDto.title,
         description: createDto.description,
-        eventDate: new Date(createDto.eventDate),
+        eventDate,
         childId: createDto.childId,
         classroomId: createDto.classroomId,
         planningId: createDto.planningId,
-        curriculumEntryId: createDto.curriculumEntryId, // NOVO
+        curriculumEntryId: createDto.curriculumEntryId,
+
+        // Micro-gestos (JSONB / estruturados)
+        medicaoAlimentar: createDto.medicaoAlimentar ?? undefined,
+        sonoMinutos: createDto.sonoMinutos ?? undefined,
+        trocaFraldaStatus: createDto.trocaFraldaStatus ?? undefined,
+
         tags: createDto.tags || [],
         aiContext: createDto.aiContext || {},
         mediaUrls: createDto.mediaUrls || [],
@@ -182,12 +235,12 @@ export class DiaryEventService {
       },
     });
 
-    // Registrar auditoria
+    // Auditoria automática (Entity: DIARY_EVENT, Action: CREATE)
     await this.auditService.logCreate(
-      'DiaryEvent',
+      AuditLogEntity.DIARY_EVENT,
       diaryEvent.id,
       user.sub,
-        classroom.unit.mantenedoraId,
+      classroom.unit.mantenedoraId,
       classroom.unitId,
       diaryEvent,
     );
@@ -482,6 +535,39 @@ export class DiaryEventService {
     );
 
     return { message: 'Evento deletado com sucesso' };
+  }
+
+  /**
+   * Helpers de Segmento/Idade (Sprint 1)
+   */
+  private diffInMonths(dateOfBirth: Date, eventDate: Date): number {
+    const a = new Date(dateOfBirth);
+    const b = new Date(eventDate);
+
+    if (b.getTime() < a.getTime()) {
+      throw new BadRequestException('eventDate não pode ser anterior à data de nascimento');
+    }
+
+    let months = (b.getUTCFullYear() - a.getUTCFullYear()) * 12;
+    months += b.getUTCMonth() - a.getUTCMonth();
+
+    // Se o dia do mês ainda não foi alcançado, reduz 1 mês
+    if (b.getUTCDate() < a.getUTCDate()) {
+      months -= 1;
+    }
+
+    return months;
+  }
+
+  private inferSegmentFromClassroom(
+    ageGroupMin: number,
+    ageGroupMax: number,
+  ): 'EI01' | 'EI02' | 'EI03' {
+    // Regras práticas por faixa etária (meses):
+    // EI01: 0–18 | EI02: 19–36 | EI03: 37+
+    if (ageGroupMax <= 18) return 'EI01';
+    if (ageGroupMax <= 36) return 'EI02';
+    return 'EI03';
   }
 
   /**

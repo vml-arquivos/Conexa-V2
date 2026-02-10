@@ -704,6 +704,7 @@ model CurriculumMatrixEntry {
   @@index([date])
   @@index([weekOfYear])
   @@index([campoDeExperiencia])
+  @@index([objetivoBNCCCode])
 }
 
 /// Template de planejamento (reutilizável)
@@ -801,7 +802,7 @@ model DiaryEvent {
   classroomId           String
   childId               String
   planningId            String?
-  curriculumEntryId     String?  // Nova relação com a entrada da matriz curricular
+  curriculumEntryId     String  // Nova relação com a entrada da matriz curricular
   
   // Identificação
   type                  DiaryEventType
@@ -814,6 +815,11 @@ model DiaryEvent {
   developmentNotes      String?  @db.Text // Marcos de desenvolvimento
   behaviorNotes         String?  @db.Text
   
+  
+  // Micro-gestos (JSONB)
+  medicaoAlimentar      Json?
+  sonoMinutos           Json?
+  trocaFraldaStatus     Json?
   // Dados estruturados para IA (JSONB)
   tags                  Json?    // tags para categorização
   aiContext             Json?    // contexto para agentes IA
@@ -837,7 +843,7 @@ model DiaryEvent {
   classroom             Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   child                 Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
   planning              Planning? @relation(fields: [planningId], references: [id], onDelete: SetNull)
-  curriculumEntry       CurriculumMatrixEntry? @relation(fields: [curriculumEntryId], references: [id], onDelete: SetNull)
+  curriculumEntry       CurriculumMatrixEntry @relation(fields: [curriculumEntryId], references: [id], onDelete: Restrict)
   createdByUser         User?    @relation("CreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
   reviewedByUser        User?    @relation("ReviewedBy", fields: [reviewedBy], references: [id], onDelete: SetNull)
   
