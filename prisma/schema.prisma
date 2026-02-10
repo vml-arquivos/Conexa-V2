@@ -556,6 +556,8 @@ model Enrollment {
   // Relações
   child     Child     @relation(fields: [childId], references: [id], onDelete: Cascade)
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  Student   Student?  @relation(fields: [studentId], references: [id])
+  studentId String?
 
   @@unique([childId, classroomId])
   @@index([childId])
@@ -600,6 +602,7 @@ model Classroom {
   attendances      Attendance[]
   materialRequests MaterialRequest[]
   reportBases      ReportBase[]
+  Student          Student[]
 
   @@unique([unitId, code])
   @@index([unitId])
@@ -1160,4 +1163,35 @@ model DailyMetric {
   @@unique([unitId, date, type])
   @@index([unitId, date])
   @@index([type, date])
+}
+
+enum MaterialCatalogCategory {
+  HYGIENE
+  PEDAGOGICAL
+  FOOD
+}
+
+model MaterialCatalog {
+  id            String                  @id @default(cuid())
+  item          String                  @db.VarChar(255)
+  category      MaterialCatalogCategory
+  unit          String                  @db.VarChar(50)
+  mantenedoraId String
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  @@index([mantenedoraId, category])
+}
+
+model Student {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  birthDate   DateTime
+  unitId      String
+  classroomId String?
+  createdAt   DateTime @default(now())
+
+  classroom   Classroom?   @relation(fields: [classroomId], references: [id])
+  enrollments Enrollment[]
 }
