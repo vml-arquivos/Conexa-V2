@@ -20,9 +20,11 @@ import { ReportsModule } from './reports/reports.module';
 import { MaterialRequestModule } from './material-request/material-request.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
+import { AdminModule } from './admin/admin.module';
+
 @Module({
   imports: [
-    EventEmitterModule.forRoot({ global: true }), ConfigModule.forRoot({
+    AdminModule, EventEmitterModule.forRoot({ global: true }), ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
     }),
