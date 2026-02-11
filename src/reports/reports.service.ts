@@ -243,4 +243,124 @@ export class ReportsService {
       events,
     };
   }
+
+  /**
+   * Dashboard Unificado - Radar de Gestão
+   * Sprint 6: Integração segura (read-only, fail-safe)
+   */
+  async getUnifiedDashboard(user: JwtPayload, unitId?: string) {
+    try {
+      // Validação de acesso
+      const targetUnitId = unitId || user.unitId;
+      
+      if (!targetUnitId) {
+        throw new BadRequestException(
+          'unitId é obrigatório (via query ou token)',
+        );
+      }
+
+      // Verificar se usuário tem acesso à unidade
+      if (!user.roles.some((role) => role.level === RoleLevel.DEVELOPER)) {
+        const unit = await this.prisma.unit.findUnique({
+          where: { id: targetUnitId },
+          select: { mantenedoraId: true },
+        });
+
+        if (!unit) {
+          throw new BadRequestException('Unidade não encontrada');
+        }
+
+        // MANTENEDORA: deve ser da mesma mantenedora
+        if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
+          if (unit.mantenedoraId !== user.mantenedoraId) {
+            throw new ForbiddenException(
+              'Sem acesso à unidade informada',
+            );
+          }
+        }
+        // UNIDADE/STAFF_CENTRAL: deve ser a própria unitId
+        else if (
+          user.roles.some(
+            (role) =>
+              role.level === RoleLevel.UNIDADE ||
+              role.level === RoleLevel.STAFF_CENTRAL,
+          )
+        ) {
+          if (targetUnitId !== user.unitId) {
+            throw new ForbiddenException(
+              'Sem acesso à unidade informada',
+            );
+          }
+        }
+      }
+
+      // === LÓGICA PEDAGÓGICA: Aderência à Matriz Curricular ===
+      const totalEvents = await this.prisma.diaryEvent.count({
+        where: { unitId: targetUnitId },
+      });
+
+      const eventsWithoutMatrix = await this.prisma.diaryEvent.count({
+        where: {
+          unitId: targetUnitId,
+          curriculumEntryId: null as any,
+        },
+      });
+
+      const adherenceRate =
+        totalEvents > 0
+          ? ((totalEvents - eventsWithoutMatrix) / totalEvents) * 100
+          : 0;
+
+      const pedagogicalStatus =
+        adherenceRate >= 80 ? 'OK' : adherenceRate >= 60 ? 'WARNING' : 'CRITICAL';
+
+      // === LÓGICA OPERACIONAL: Gargalos Críticos ===
+      const twoDaysAgo = new Date();
+      twoDaysAgo.setHours(twoDaysAgo.getHours() - 48);
+
+      const criticalBottlenecks = await this.prisma.materialRequest.count({
+        where: {
+          unitId: targetUnitId,
+          status: 'SOLICITADO',
+          requestedDate: {
+            lt: twoDaysAgo,
+          },
+        },
+      });
+
+      return {
+        pedagogical: {
+          adherenceRate: Math.round(adherenceRate * 100) / 100,
+          status: pedagogicalStatus,
+          totalEvents,
+          eventsWithoutMatrix,
+        },
+        operational: {
+          criticalBottlenecks,
+        },
+      };
+    } catch (error) {
+      // Fail-safe: retornar valores zerados em caso de erro
+      if (
+        error instanceof BadRequestException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+
+      console.error('Erro ao calcular dashboard unificado:', error);
+      
+      return {
+        pedagogical: {
+          adherenceRate: 0,
+          status: 'CRITICAL' as const,
+          totalEvents: 0,
+          eventsWithoutMatrix: 0,
+        },
+        operational: {
+          criticalBottlenecks: 0,
+        },
+      };
+    }
+  }
 }

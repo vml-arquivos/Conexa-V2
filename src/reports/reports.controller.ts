@@ -65,4 +65,21 @@ export class ReportsController {
   getUnplannedDiaryEvents(@CurrentUser() user: JwtPayload) {
     return this.reportsService.getUnplannedDiaryEvents(user);
   }
+
+  /**
+   * GET /reports/dashboard/unified
+   * Dashboard Unificado - Radar de Gestão (Sprint 6)
+   *
+   * RBAC:
+   * - DEVELOPER, MANTENEDORA, STAFF_CENTRAL, UNIDADE: acesso
+   * - PROFESSOR: negado
+   */
+  @Get('dashboard/unified')
+  @RequireRoles('DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL', 'UNIDADE')
+  getUnifiedDashboard(
+    @Query('unitId') unitId: string | undefined,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.reportsService.getUnifiedDashboard(user, unitId);
+  }
 }
