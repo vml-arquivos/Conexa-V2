@@ -262,7 +262,6 @@ model Mantenedora {
   reportBases        ReportBase[]
   aiContexts         AIContext[]
   auditLogs          AuditLog[]
-  MaterialCatalog    MaterialCatalog[]
 
   @@index([cnpj])
   @@index([isActive])
@@ -1161,28 +1160,4 @@ model DailyMetric {
   @@unique([unitId, date, type])
   @@index([unitId, date])
   @@index([type, date])
-}
-
-enum MaterialCatalogCategory {
-  HYGIENE
-  PEDAGOGICAL
-  FOOD
-}
-
-model MaterialCatalog {
-  id            String @id @default(cuid())
-  mantenedoraId String
-
-  item     String                  @db.VarChar(255)
-  category MaterialCatalogCategory
-  unit     String                  @db.VarChar(50)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
-
-  @@unique([mantenedoraId, item, category, unit])
-  @@index([mantenedoraId, category])
-  @@index([mantenedoraId, item])
 }
