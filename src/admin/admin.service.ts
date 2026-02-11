@@ -1,306 +1,200 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { MaterialCatalogCategory } from '@prisma/client';
+import { EnrollmentStatus, RoleLevel } from '@prisma/client';
 import { Readable } from 'stream';
 import csvParser from 'csv-parser';
-import { parse, isValid } from 'date-fns';
 
-type CsvRow = Record<string, any>;
-
-function norm(v: any): string {
+function norm(v: unknown): string {
   return String(v ?? '').trim();
 }
 
-function stripTeacherPrefix(name: string): string {
-  return name
-    .replace(/\bPROFESSORA\b/gi, '')
-    .replace(/\bPROFESSOR\b/gi, '')
-    .replace(/\bPROFA\.?\b/gi, '')
-    .replace(/\bPROF\.?\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+function splitName(full: string): { firstName: string; lastName: string } {
+  const parts = full.split(/\s+/).filter(Boolean);
+  const firstName = parts[0] ?? '';
+  const lastName = parts.slice(1).join(' ') || '.';
+  return { firstName, lastName };
 }
 
-function splitName(full: string): { firstName: string; lastName: string } {
-  const clean = norm(full).replace(/\s+/g, ' ').trim();
-  const parts = clean.split(' ').filter(Boolean);
-  if (parts.length === 0) return { firstName: '', lastName: '' };
-  if (parts.length === 1) return { firstName: parts[0], lastName: '' };
-  return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+/**
+ * dd/mm/yyyy ou ISO -> Date UTC (00:00Z).
+ * inválido -> null (não corromper com "hoje").
+ */
+function parseBirthDate(raw: string): Date | null {
+  const s = norm(raw);
+  if (!s) return null;
+
+  const iso = new Date(s);
+  if (!Number.isNaN(iso.getTime())) {
+    return new Date(Date.UTC(iso.getUTCFullYear(), iso.getUTCMonth(), iso.getUTCDate()));
+  }
+
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const mon = Number(m[2]);
+  const year = Number(m[3]);
+  if (!day || !mon || !year) return null;
+  return new Date(Date.UTC(year, mon - 1, day));
 }
 
 function classroomCodeFromName(name: string): string {
-  const c = norm(name)
-    .toUpperCase()
+  const ascii = name
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // remove acentos
-    .replace(/[^A-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 40);
-  return c || `TURMA_${Date.now()}`;
-}
-
-function parseBirthDateToUTC(raw: string): Date | null {
-  const v = norm(raw);
-  if (!v) return null;
-
-  // dd/MM/yyyy (BR)
-  const d1 = parse(v, 'dd/MM/yyyy', new Date());
-  if (isValid(d1)) return new Date(Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate()));
-
-  // d/M/yyyy
-  const d2 = parse(v, 'd/M/yyyy', new Date());
-  if (isValid(d2)) return new Date(Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate()));
-
-  // ISO fallback
-  const iso = new Date(v);
-  if (!Number.isNaN(iso.getTime())) return new Date(Date.UTC(iso.getUTCFullYear(), iso.getUTCMonth(), iso.getUTCDate()));
-
-  return null;
-}
-
-function detectSeparator(buffer: Buffer): ',' | ';' {
-  const head = buffer.toString('utf8', 0, Math.min(buffer.length, 4096));
-  const firstLine = head.split(/\r?\n/)[0] || '';
-  const commas = (firstLine.match(/,/g) || []).length;
-  const semis = (firstLine.match(/;/g) || []).length;
-  return semis > commas ? ';' : ',';
-}
-
-async function parseCsv(buffer: Buffer): Promise<CsvRow[]> {
-  const sep = detectSeparator(buffer);
-  return new Promise((resolve, reject) => {
-    const rows: CsvRow[] = [];
-    Readable.from(buffer)
-      .pipe(
-        csvParser({
-          separator: sep,
-          mapHeaders: ({ header }) => (header ? header.trim() : header),
-        }),
-      )
-      .on('data', (row: CsvRow) => rows.push(row))
-      .on('end', () => resolve(rows))
-      .on('error', (err: any) => reject(err));
-  });
-}
-
-function mapCategory(raw: string): MaterialCatalogCategory {
-  const v = norm(raw).toUpperCase();
-  if (v === 'HYGIENE' || v === 'HIGIENE') return MaterialCatalogCategory.HYGIENE;
-  if (v === 'PEDAGOGICAL' || v === 'PEDAGOGICO' || v === 'PEDAGÓGICO') return MaterialCatalogCategory.PEDAGOGICAL;
-  if (v === 'FOOD' || v === 'ALIMENTACAO' || v === 'ALIMENTAÇÃO') return MaterialCatalogCategory.FOOD;
-  return MaterialCatalogCategory.HYGIENE;
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+  return (
+    ascii
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 50) || 'TURMA'
+  );
 }
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
   constructor(private readonly prisma: PrismaService) {}
 
-  private async resolveUnitId(user: JwtPayload, unitIdParam?: string): Promise<string> {
-    if (!user?.mantenedoraId) throw new BadRequestException('mantenedoraId ausente no token');
+  private isDeveloper(user: JwtPayload): boolean {
+    return Array.isArray(user?.roles) && user.roles.some((r) => r.level === RoleLevel.DEVELOPER);
+  }
 
-    if (unitIdParam) {
-      const u = await this.prisma.unit.findFirst({
-        where: { id: unitIdParam, mantenedoraId: user.mantenedoraId },
-        select: { id: true },
+  private async assertUnitAccess(user: JwtPayload, unitId: string): Promise<void> {
+    if (!user?.mantenedoraId) throw new BadRequestException('mantenedoraId ausente no token');
+    if (this.isDeveloper(user)) return;
+
+    // MANTENEDORA: qualquer unidade da mesma mantenedora
+    const isMantenedora = user.roles.some((r) => r.level === RoleLevel.MANTENEDORA);
+    if (isMantenedora) {
+      const unit = await this.prisma.unit.findUnique({
+        where: { id: unitId },
+        select: { mantenedoraId: true },
       });
-      if (!u) throw new BadRequestException('unitId inválido para esta mantenedora');
-      return u.id;
+      if (!unit || unit.mantenedoraId !== user.mantenedoraId) {
+        throw new ForbiddenException('Sem acesso à unidade informada');
+      }
+      return;
     }
 
-    if (user.unitId) return user.unitId;
+    // UNIDADE: somente sua própria unitId
+    const isUnidade = user.roles.some((r) => r.level === RoleLevel.UNIDADE);
+    if (isUnidade) {
+      if (user.unitId !== unitId) throw new ForbiddenException('Sem acesso à unidade informada');
+      return;
+    }
 
-    const units = await this.prisma.unit.findMany({
-      where: { mantenedoraId: user.mantenedoraId },
-      select: { id: true },
-      take: 2,
+    throw new ForbiddenException('Perfil sem permissão para importação');
+  }
+
+  async importStructureCsv(file: Express.Multer.File, user: JwtPayload, unitIdFromQuery?: string) {
+    if (!file?.buffer?.length) throw new BadRequestException('Arquivo vazio');
+
+    const unitId = norm(unitIdFromQuery) || norm(user.unitId);
+    if (!unitId) {
+      throw new BadRequestException('unitId obrigatório (use ?unitId=... para perfil MANTENEDORA)');
+    }
+
+    await this.assertUnitAccess(user, unitId);
+
+    const rows: any[] = [];
+    await new Promise<void>((resolve, reject) => {
+      Readable.from(file.buffer)
+        .pipe(csvParser())
+        .on('data', (row) => rows.push(row))
+        .on('end', () => resolve())
+        .on('error', (err) => reject(err));
     });
 
-    if (units.length === 1) return units[0].id;
-    throw new BadRequestException('unitId obrigatório (mantenedora possui múltiplas unidades)');
-  }
-
-  async importMaterialCatalogCsv(file: Express.Multer.File, user: JwtPayload) {
-    if (!file?.buffer?.length) throw new BadRequestException('Arquivo CSV ausente');
-    if (!user?.mantenedoraId) throw new BadRequestException('mantenedoraId ausente no token');
-
-    const rows = await parseCsv(file.buffer);
-
-    let upserted = 0;
-    let skipped = 0;
-
-    for (const r of rows) {
-      const item = norm(r.item ?? r.Item ?? r.ITEM);
-      const unit = norm(r.unit ?? r.Unit ?? r.UNIT);
-      const categoryRaw = norm(r.category ?? r.Category ?? r.CATEGORY);
-
-      if (!item || !unit) { skipped++; continue; }
-      const category = mapCategory(categoryRaw);
-
-      await this.prisma.materialCatalog.upsert({
-        where: {
-          mantenedoraId_item_category_unit: {
-            mantenedoraId: user.mantenedoraId,
-            item,
-            category,
-            unit,
-          },
-        },
-        create: { mantenedoraId: user.mantenedoraId, item, category, unit },
-        update: {},
-      });
-
-      upserted++;
-    }
-
-    return { ok: true, rows: rows.length, upserted, skipped };
-  }
-
-  // CSV REAL: ALUNO, NASCIMENTO, TURMA, PROFESSORA
-  async importCepi2026Csv(file: Express.Multer.File, user: JwtPayload, unitIdParam?: string) {
-    if (!file?.buffer?.length) throw new BadRequestException('Arquivo CSV ausente');
-    if (!user?.mantenedoraId) throw new BadRequestException('mantenedoraId ausente no token');
-
-    const unitId = await this.resolveUnitId(user, unitIdParam);
-    const rows = await parseCsv(file.buffer);
-
-    let classroomsUpserted = 0;
-    let teacherLinks = 0;
-    let childrenUpserted = 0;
-    let enrollmentsUpserted = 0;
-
-    const missingTeachers: string[] = [];
-    const invalidRows: Array<{ row: number; reason: string }> = [];
-
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
-
-      const aluno = norm(r.ALUNO ?? r.Aluno ?? r.aluno);
-      const nascimento = norm(r.NASCIMENTO ?? r.Nascimento ?? r.nascimento);
-      const turma = norm(r.TURMA ?? r.Turma ?? r.turma);
-      const professoraRaw = norm(r.PROFESSORA ?? r.Professora ?? r.professora);
-
-      if (!aluno || !turma) {
-        invalidRows.push({ row: i + 1, reason: 'ALUNO ou TURMA vazio' });
-        continue;
-      }
-
-      const dob = parseBirthDateToUTC(nascimento);
-      if (!dob) {
-        invalidRows.push({ row: i + 1, reason: 'NASCIMENTO inválido (esperado dd/MM/yyyy)' });
-        continue;
-      }
-
-      const classroomCode = classroomCodeFromName(turma);
-
-      const classroom = await this.prisma.classroom.upsert({
-        where: { unitId_code: { unitId, code: classroomCode } },
-        create: {
-          unitId,
-          name: turma,
-          code: classroomCode,
-          createdBy: user.sub,
-        },
-        update: {
-          name: turma,
-          updatedBy: user.sub,
-        },
-        select: { id: true },
-      });
-      classroomsUpserted++;
-
-      // Teacher link (se professor existir)
-      const profName = stripTeacherPrefix(professoraRaw);
-      if (profName) {
-        const t = splitName(profName);
-        if (t.firstName) {
-          const teacher = await this.prisma.user.findFirst({
-            where: {
-              mantenedoraId: user.mantenedoraId,
-              firstName: { equals: t.firstName, mode: 'insensitive' },
-              lastName: { equals: t.lastName, mode: 'insensitive' },
-            },
-            select: { id: true },
-          });
-
-          if (teacher) {
-            await this.prisma.classroomTeacher.upsert({
-              where: { classroomId_teacherId: { classroomId: classroom.id, teacherId: teacher.id } },
-              create: { classroomId: classroom.id, teacherId: teacher.id },
-              update: { isActive: true },
-            });
-            teacherLinks++;
-          } else {
-            missingTeachers.push(profName);
-          }
-        }
-      }
-
-      const n = splitName(aluno);
-      if (!n.firstName) {
-        invalidRows.push({ row: i + 1, reason: 'ALUNO inválido' });
-        continue;
-      }
-
-      const existing = await this.prisma.child.findFirst({
-        where: {
-          mantenedoraId: user.mantenedoraId,
-          unitId,
-          firstName: n.firstName,
-          lastName: n.lastName,
-          dateOfBirth: dob,
-        },
-        select: { id: true },
-      });
-
-      const childId =
-        existing?.id ??
-        (
-          await this.prisma.child.create({
-            data: {
-              mantenedoraId: user.mantenedoraId,
-              unitId,
-              firstName: n.firstName,
-              lastName: n.lastName,
-              dateOfBirth: dob,
-              createdBy: user.sub,
-            },
-            select: { id: true },
-          })
-        ).id;
-
-      childrenUpserted++;
-
-      await this.prisma.enrollment.upsert({
-        where: { childId_classroomId: { childId, classroomId: classroom.id } },
-        create: {
-          childId,
-          classroomId: classroom.id,
-          enrollmentDate: new Date(),
-          createdBy: user.sub,
-        },
-        update: {
-          status: 'ATIVA' as any,
-          updatedBy: user.sub,
-        },
-      });
-      enrollmentsUpserted++;
-    }
-
-    // dedup missing teachers
-    const uniqMissing = Array.from(new Set(missingTeachers)).sort();
-
-    return {
-      ok: true,
-      unitId,
+    const stats = {
       rows: rows.length,
-      classroomsUpserted,
-      teacherLinks,
-      childrenUpserted,
-      enrollmentsUpserted,
-      missingTeachers: uniqMissing,
-      invalidRows,
+      classroomsUpserted: 0,
+      childrenCreated: 0,
+      enrollmentsUpserted: 0,
+      skipped: 0,
+      skippedReasons: { missingNameOrClass: 0, invalidBirthDate: 0 },
     };
+
+    for (const row of rows) {
+      const fullName = norm(row['ALUNO'] ?? row['Aluno'] ?? row['aluno']);
+      const turmaName = norm(row['TURMA'] ?? row['Turma'] ?? row['turma']);
+      const rawBirth = norm(row['NASCIMENTO'] ?? row['Nascimento'] ?? row['nascimento']);
+
+      if (!fullName || !turmaName) {
+        stats.skipped++;
+        stats.skippedReasons.missingNameOrClass++;
+        continue;
+      }
+
+      const birthDate = parseBirthDate(rawBirth);
+      if (!birthDate) {
+        stats.skipped++;
+        stats.skippedReasons.invalidBirthDate++;
+        continue;
+      }
+
+      const { firstName, lastName } = splitName(fullName);
+      const classroomCode = classroomCodeFromName(turmaName);
+
+      await this.prisma.$transaction(async (tx) => {
+        const classroom = await tx.classroom.upsert({
+          where: { unitId_code: { unitId, code: classroomCode } },
+          update: { name: turmaName, updatedBy: user.sub },
+          create: { unitId, name: turmaName, code: classroomCode, createdBy: user.sub },
+          select: { id: true },
+        });
+        stats.classroomsUpserted++;
+
+        const existing = await tx.child.findFirst({
+          where: {
+            mantenedoraId: user.mantenedoraId,
+            unitId,
+            firstName: { equals: firstName, mode: 'insensitive' },
+            lastName: { equals: lastName, mode: 'insensitive' },
+            dateOfBirth: birthDate,
+          },
+          select: { id: true },
+        });
+
+        const childId =
+          existing?.id ??
+          (
+            await tx.child.create({
+              data: {
+                mantenedoraId: user.mantenedoraId,
+                unitId,
+                firstName,
+                lastName,
+                dateOfBirth: birthDate,
+                createdBy: user.sub,
+              },
+              select: { id: true },
+            })
+          ).id;
+
+        if (!existing) stats.childrenCreated++;
+
+        await tx.enrollment.upsert({
+          where: { childId_classroomId: { childId, classroomId: classroom.id } },
+          update: { status: EnrollmentStatus.ATIVA, withdrawalDate: null, updatedBy: user.sub },
+          create: {
+            childId,
+            classroomId: classroom.id,
+            enrollmentDate: new Date(),
+            status: EnrollmentStatus.ATIVA,
+            createdBy: user.sub,
+          },
+        });
+        stats.enrollmentsUpserted++;
+      });
+    }
+
+    this.logger.log(`Import CEPI concluído: ${JSON.stringify(stats)}`);
+    return { ok: true, unitId, stats };
   }
 }
