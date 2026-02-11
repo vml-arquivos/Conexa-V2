@@ -4,12 +4,16 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../common/services/audit.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { RoleLevel } from '@prisma/client';
+import { RoleLevel, AuditLogAction } from '@prisma/client';
 
 @Injectable()
 export class DashboardsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   /**
    * Dashboard da Unidade - KPIs operacionais e pedagógicos
@@ -117,6 +121,17 @@ export class DashboardsService {
         },
       });
 
+      // Auditoria VIEW (best-effort)
+      await this.audit.log({
+        action: AuditLogAction.VIEW,
+        entity: 'UNIT',
+        entityId: targetUnitId,
+        userId: user.sub,
+        mantenedoraId: user.mantenedoraId || '',
+        unitId: targetUnitId,
+        description: 'Dashboard da unidade visualizado',
+      });
+
       return {
         unitId: targetUnitId,
         period: {
@@ -211,6 +226,17 @@ export class DashboardsService {
           endOfDay,
         );
 
+        // Auditoria VIEW (best-effort)
+        await this.audit.log({
+          action: AuditLogAction.VIEW,
+          entity: 'CLASSROOM',
+          entityId: classroomId,
+          userId: user.sub,
+          mantenedoraId: user.mantenedoraId || '',
+          unitId: classroom.unitId,
+          description: 'Dashboard do professor visualizado',
+        });
+
         return {
           date: targetDate.toISOString().split('T')[0],
           classrooms: [
@@ -256,6 +282,19 @@ export class DashboardsService {
             };
           }),
         );
+
+        // Auditoria VIEW (best-effort) - primeira turma como referência
+        if (teacherClassrooms.length > 0) {
+          await this.audit.log({
+            action: AuditLogAction.VIEW,
+            entity: 'CLASSROOM',
+            entityId: teacherClassrooms[0].classroom.id,
+            userId: user.sub,
+            mantenedoraId: user.mantenedoraId || '',
+            unitId: teacherClassrooms[0].classroom.unitId,
+            description: `Dashboard do professor visualizado (${teacherClassrooms.length} turmas)`,
+          });
+        }
 
         return {
           date: targetDate.toISOString().split('T')[0],
@@ -315,9 +354,30 @@ export class DashboardsService {
       },
     });
 
-    // Microgestos preenchidos (assumindo campo microGestures no DiaryEvent)
-    // Se não existir, retornar 0
-    const microGesturesFilled = 0; // TODO: implementar quando campo existir
+    // Microgestos preenchidos
+    // Contar eventos com pelo menos um dos campos preenchido:
+    // medicaoAlimentar, sonoMinutos, trocaFraldaStatus
+    const eventsWithMicroGestures = await this.prisma.diaryEvent.findMany({
+      where: {
+        classroomId,
+        eventDate: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      select: {
+        medicaoAlimentar: true,
+        sonoMinutos: true,
+        trocaFraldaStatus: true,
+      },
+    });
+
+    const microGesturesFilled = eventsWithMicroGestures.filter(
+      (event) =>
+        event.medicaoAlimentar !== null ||
+        event.sonoMinutos !== null ||
+        event.trocaFraldaStatus !== null,
+    ).length;
 
     // Status do planejamento ativo
     const activePlanning = await this.prisma.planning.findFirst({
