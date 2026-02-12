@@ -66,6 +66,17 @@ export class PlanningTemplateController {
   }
 
   /**
+   * GET /planning-templates/cocris-defaults
+   * Retorna templates padrão COCRIS (estático)
+   * 
+   * Acesso: Todos os usuários autenticados
+   */
+  @Get('cocris-defaults')
+  getCocrisDefaults() {
+    return this.planningTemplateService.getCocrisDefaults();
+  }
+
+  /**
    * GET /planning-templates/:id
    * Busca um template específico por ID
    *

@@ -252,4 +252,99 @@ export class PlanningTemplateService {
 
     // Templates não têm escopo de mantenedora no schema atual
   }
+
+  /**
+   * Retorna templates padrão COCRIS (estático)
+   */
+  getCocrisDefaults() {
+    return [
+      {
+        id: 'cocris-semanal',
+        name: 'Planejamento Semanal',
+        description: 'Template para planejamento semanal de atividades pedagógicas (Coordenação + Professor)',
+        type: 'SEMANAL',
+        sections: [
+          {
+            title: 'Identificação',
+            fields: ['unidade', 'turma', 'professor', 'semana', 'periodo'],
+          },
+          {
+            title: 'Objetivos da Semana',
+            fields: ['objetivos_gerais', 'campos_experiencia'],
+          },
+          {
+            title: 'Atividades Planejadas',
+            fields: ['segunda', 'terca', 'quarta', 'quinta', 'sexta'],
+          },
+          {
+            title: 'Recursos Necessários',
+            fields: ['materiais', 'espacos'],
+          },
+          {
+            title: 'Observações',
+            fields: ['observacoes', 'adaptacoes'],
+          },
+        ],
+        isActive: true,
+      },
+      {
+        id: 'cocris-diario-bncc',
+        name: 'Planejamento Diário BNCC',
+        description: 'Template para planejamento diário alinhado à BNCC (Professor)',
+        type: 'DIARIO',
+        sections: [
+          {
+            title: 'Identificação',
+            fields: ['data', 'turma', 'professor', 'faixa_etaria'],
+          },
+          {
+            title: 'Campo de Experiência BNCC',
+            fields: ['campo_experiencia', 'objetivos_aprendizagem'],
+          },
+          {
+            title: 'Atividade Principal',
+            fields: ['titulo', 'descricao', 'duracao', 'materiais'],
+          },
+          {
+            title: 'Desenvolvimento',
+            fields: ['introducao', 'desenvolvimento', 'conclusao'],
+          },
+          {
+            title: 'Avaliação',
+            fields: ['criterios', 'observacoes_criancas'],
+          },
+        ],
+        isActive: true,
+      },
+      {
+        id: 'cocris-reuniao-coordenacao',
+        name: 'Reunião Semanal de Coordenação',
+        description: 'Template para registro de reuniões de coordenação pedagógica (pauta + decisões + encaminhamentos)',
+        type: 'REUNIAO',
+        sections: [
+          {
+            title: 'Identificação',
+            fields: ['data', 'horario', 'participantes', 'facilitador'],
+          },
+          {
+            title: 'Pauta',
+            fields: ['temas', 'objetivos_reuniao'],
+          },
+          {
+            title: 'Discussões e Decisões',
+            fields: ['pontos_discutidos', 'decisoes_tomadas'],
+          },
+          {
+            title: 'Encaminhamentos',
+            fields: ['acoes', 'responsaveis', 'prazos'],
+          },
+          {
+            title: 'Próxima Reunião',
+            fields: ['data_proxima', 'pauta_proxima'],
+          },
+        ],
+        isActive: true,
+      },
+    ];
+  }
 }

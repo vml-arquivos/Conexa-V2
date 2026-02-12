@@ -1,0 +1,68 @@
+[
+  {
+    "code": "ARARA-CAN",
+    "name": "CEPI Arara Canindé",
+    "address": "Qd 307 Cj 11 nº 1 – Recanto das Emas",
+    "city": "Brasília",
+    "state": "DF",
+    "zipCode": "72621412",
+    "phone": "(61) 3575-4363",
+    "email": "aracaninde@gmail.com",
+    "region": "Recanto das Emas"
+  },
+  {
+    "code": "BEIJA-FLO",
+    "name": "CEPI Beija-Flor",
+    "address": "Qd 107 Cj 8-A – Recanto das Emas",
+    "city": "Brasília",
+    "state": "DF",
+    "zipCode": "72601310",
+    "phone": "(61) 3081-7602 / (61) 99671-312",
+    "email": "beijaflorcreremas@gmail.com",
+    "region": "Recanto das Emas"
+  },
+  {
+    "code": "SABIA-CAM",
+    "name": "CEPI Sabiá do Campo",
+    "address": "Qd 305 Cj 2-A Lote 1 – Recanto das Emas",
+    "city": "Brasília",
+    "state": "DF",
+    "zipCode": "72621200",
+    "phone": "(61) 3578-5160",
+    "email": "cepisabiadocampo@hotmail.com",
+    "region": "Recanto das Emas"
+  },
+  {
+    "code": "CORAC-CRI",
+    "name": "Escola de Educação Infantil Coração de Cristo (Creche CoCris)",
+    "address": "Qd 301 Avenida Recanto das Emas, Lote 26 – Recanto das Emas",
+    "city": "Brasília",
+    "state": "DF",
+    "zipCode": "72620214",
+    "phone": "(61) 3575-4119",
+    "email": "crechemovimento@gmail.com",
+    "region": "Recanto das Emas"
+  },
+  {
+    "code": "PELICANO",
+    "name": "Pelicano – Centro de Convivência e Educação Infantil (Creche Pelicano)",
+    "address": "Cond. Residencial São Francisco – Recanto das Emas",
+    "city": "Brasília",
+    "state": "DF",
+    "zipCode": "72620200",
+    "phone": "(61) 3575-4125 / (61) 3559-2784",
+    "email": "crechepelicano@gmail.com",
+    "region": "Recanto das Emas"
+  },
+  {
+    "code": "FLAMBOY",
+    "name": "CEPI Flamboyant",
+    "address": "Área Especial 1 Setor Sul – Brazlândia",
+    "city": "Brasília",
+    "state": "DF",
+    "zipCode": "72715610",
+    "phone": "(61) 3081-5118",
+    "email": "flamboyantbraz@gmail.com",
+    "region": "Brazlândia"
+  }
+]
