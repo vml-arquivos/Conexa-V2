@@ -11,13 +11,31 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { RequireRoles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
+import { CacheTTL } from '@nestjs/cache-manager';
+import { TenantCacheInterceptor } from '../cache/tenant-cache.interceptor';
 
 @Controller('reports/dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@UseInterceptors(CacheInterceptor)
+@UseInterceptors(TenantCacheInterceptor)
 export class DashboardsController {
   constructor(private readonly dashboardsService: DashboardsService) {}
+
+  /**
+   * GET /reports/dashboard/mantenedora
+   * Dashboard da Mantenedora - KPIs globais
+   *
+   * RBAC:
+   * - MANTENEDORA, DEVELOPER: acesso
+   * - Outros: negado
+   *
+   * Cache: 300s (5 minutos)
+   */
+  @Get('mantenedora')
+  @RequireRoles('MANTENEDORA', 'DEVELOPER')
+  @CacheTTL(300)
+  getMantenedoraStats(@CurrentUser() user: JwtPayload) {
+    return this.dashboardsService.getMantenedoraStats(user);
+  }
 
   /**
    * GET /reports/dashboard/unit
