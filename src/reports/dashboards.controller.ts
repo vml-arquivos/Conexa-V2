@@ -20,6 +20,23 @@ export class DashboardsController {
   constructor(private readonly dashboardsService: DashboardsService) {}
 
   /**
+   * GET /reports/dashboard/mantenedora
+   * Dashboard da Mantenedora - KPIs globais
+   *
+   * RBAC:
+   * - MANTENEDORA, DEVELOPER: acesso
+   * - Outros: negado
+   *
+   * Cache: 300s (5 minutos)
+   */
+  @Get('mantenedora')
+  @RequireRoles('MANTENEDORA', 'DEVELOPER')
+  @CacheTTL(300)
+  getMantenedoraStats(@CurrentUser() user: JwtPayload) {
+    return this.dashboardsService.getMantenedoraStats(user);
+  }
+
+  /**
    * GET /reports/dashboard/unit
    * Dashboard da Unidade - KPIs operacionais e pedagógicos
    *

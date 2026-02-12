@@ -16,6 +16,83 @@ export class DashboardsService {
   ) {}
 
   /**
+   * Dashboard da Mantenedora - KPIs globais
+   * GET /reports/dashboard/mantenedora
+   */
+  async getMantenedoraStats(user: JwtPayload) {
+    try {
+      if (!user?.mantenedoraId) {
+        throw new ForbiddenException('Escopo de mantenedora ausente');
+      }
+
+      // KPI 1: Unidades da mantenedora
+      const units = await this.prisma.unit.count({
+        where: { mantenedoraId: user.mantenedoraId },
+      });
+
+      // KPI 2: Alunos ativos (Enrollment ATIVA)
+      const activeStudents = await this.prisma.enrollment.count({
+        where: {
+          status: 'ATIVA',
+          classroom: {
+            unit: { mantenedoraId: user.mantenedoraId },
+          },
+        },
+      });
+
+      // KPI 3: Alertas críticos (eventos com trocaFraldaStatus nas últimas 48h)
+      // Nota: Filtragem JSONB limitada pelo Prisma - conta todos eventos recentes
+      const since48h = new Date(Date.now() - 48 * 60 * 60 * 1000);
+      const criticalAlerts = await this.prisma.diaryEvent.count({
+        where: {
+          mantenedoraId: user.mantenedoraId,
+          createdAt: { gte: since48h },
+          trocaFraldaStatus: { not: null as any },
+        },
+      });
+
+      // Auditoria VIEW (best-effort)
+      await this.audit.log({
+        action: AuditLogAction.VIEW,
+        entity: 'MANTENEDORA',
+        entityId: user.mantenedoraId,
+        userId: user.sub,
+        mantenedoraId: user.mantenedoraId,
+        unitId: '',
+        description: 'Dashboard da mantenedora visualizado',
+      });
+
+      return {
+        scope: 'MANTENEDORA',
+        mantenedoraId: user.mantenedoraId,
+        kpis: {
+          units,
+          activeStudents,
+          criticalAlerts,
+        },
+        generatedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+
+      console.error('Erro ao calcular dashboard da mantenedora:', error);
+
+      return {
+        scope: 'MANTENEDORA',
+        mantenedoraId: user.mantenedoraId || 'unknown',
+        kpis: {
+          units: 0,
+          activeStudents: 0,
+          criticalAlerts: 0,
+        },
+        generatedAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
    * Dashboard da Unidade - KPIs operacionais e pedagógicos
    * GET /reports/dashboard/unit
    */
