@@ -6,7 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { RoleLevel, AuditLogAction } from '@prisma/client';
+import { RoleLevel, AuditLogAction, Prisma } from '@prisma/client';
 
 @Injectable()
 export class DashboardsService {
@@ -47,7 +47,7 @@ export class DashboardsService {
         where: {
           mantenedoraId: user.mantenedoraId,
           createdAt: { gte: since48h },
-          trocaFraldaStatus: { not: null as any },
+          trocaFraldaStatus: { not: Prisma.JsonNull },
         },
       });
 

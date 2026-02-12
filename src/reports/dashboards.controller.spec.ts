@@ -8,6 +8,7 @@ describe('DashboardsController', () => {
   let service: DashboardsService;
 
   const mockDashboardsService = {
+    getMantenedoraStats: jest.fn(),
     getUnitDashboard: jest.fn(),
     getTeacherDashboard: jest.fn(),
   };
@@ -38,6 +39,35 @@ describe('DashboardsController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('getMantenedoraStats', () => {
+    it('should call service.getMantenedoraStats with correct params', async () => {
+      const mockUser = {
+        sub: 'user-id',
+        email: 'mantenedora@example.com',
+        roles: [{ level: 'MANTENEDORA' }],
+        mantenedoraId: 'mant-123',
+      } as any;
+
+      const mockResult = {
+        scope: 'MANTENEDORA',
+        mantenedoraId: 'mant-123',
+        kpis: {
+          units: 10,
+          activeStudents: 500,
+          criticalAlerts: 3,
+        },
+        generatedAt: '2026-02-12T00:00:00.000Z',
+      };
+
+      mockDashboardsService.getMantenedoraStats.mockResolvedValue(mockResult);
+
+      const result = await controller.getMantenedoraStats(mockUser);
+
+      expect(service.getMantenedoraStats).toHaveBeenCalledWith(mockUser);
+      expect(result).toEqual(mockResult);
+    });
   });
 
   describe('getUnitDashboard', () => {
