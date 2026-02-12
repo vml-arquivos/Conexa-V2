@@ -47,7 +47,7 @@ export class DashboardsService {
         where: {
           mantenedoraId: user.mantenedoraId,
           createdAt: { gte: since48h },
-          trocaFraldaStatus: { not: Prisma.JsonNull },
+          trocaFraldaStatus: { not: Prisma.DbNull },
         },
       });
 
