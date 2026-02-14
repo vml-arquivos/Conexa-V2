@@ -206,6 +206,75 @@ export class PlanningTemplateService {
   }
 
   /**
+   * Retorna templates padrão COCRIS (sempre 200)
+   */
+  async getCocrisDefaults() {
+    return [
+      {
+        id: 'cocris-semanal',
+        name: 'Planejamento Semanal',
+        description: 'Template para planejamento semanal de atividades pedagógicas',
+        sections: [
+          { id: 'objetivos', title: 'Objetivos da Semana', order: 1 },
+          { id: 'segunda', title: 'Segunda-feira', order: 2 },
+          { id: 'terca', title: 'Terça-feira', order: 3 },
+          { id: 'quarta', title: 'Quarta-feira', order: 4 },
+          { id: 'quinta', title: 'Quinta-feira', order: 5 },
+          { id: 'sexta', title: 'Sexta-feira', order: 6 },
+          { id: 'observacoes', title: 'Observações', order: 7 },
+        ],
+        fields: [
+          { id: 'objetivo', label: 'Objetivo', type: 'textarea', required: true },
+          { id: 'atividades', label: 'Atividades', type: 'textarea', required: true },
+          { id: 'materiais', label: 'Materiais', type: 'text', required: false },
+        ],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'cocris-diario-bncc',
+        name: 'Planejamento Diário BNCC',
+        description: 'Template diário alinhado aos campos de experiência da BNCC',
+        sections: [
+          { id: 'campo', title: 'Campo de Experiência', order: 1 },
+          { id: 'objetivos', title: 'Objetivos de Aprendizagem', order: 2 },
+          { id: 'atividade', title: 'Atividade Proposta', order: 3 },
+          { id: 'desenvolvimento', title: 'Desenvolvimento', order: 4 },
+          { id: 'avaliacao', title: 'Avaliação', order: 5 },
+        ],
+        fields: [
+          { id: 'campo_experiencia', label: 'Campo de Experiência', type: 'select', required: true, options: ['O eu, o outro e o nós', 'Corpo, gestos e movimentos', 'Traços, sons, cores e formas', 'Escuta, fala, pensamento e imaginação', 'Espaços, tempos, quantidades, relações e transformações'] },
+          { id: 'objetivo_bncc', label: 'Código BNCC', type: 'text', required: true },
+          { id: 'descricao', label: 'Descrição da Atividade', type: 'textarea', required: true },
+          { id: 'observacoes', label: 'Observações', type: 'textarea', required: false },
+        ],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'cocris-reuniao-coordenacao',
+        name: 'Reunião Semanal de Coordenação',
+        description: 'Template para registro de reuniões de coordenação pedagógica',
+        sections: [
+          { id: 'pauta', title: 'Pauta', order: 1 },
+          { id: 'discussoes', title: 'Discussões', order: 2 },
+          { id: 'decisoes', title: 'Decisões', order: 3 },
+          { id: 'encaminhamentos', title: 'Encaminhamentos', order: 4 },
+        ],
+        fields: [
+          { id: 'data', label: 'Data', type: 'date', required: true },
+          { id: 'participantes', label: 'Participantes', type: 'textarea', required: true },
+          { id: 'item', label: 'Item', type: 'text', required: true },
+          { id: 'responsavel', label: 'Responsável', type: 'text', required: false },
+          { id: 'prazo', label: 'Prazo', type: 'date', required: false },
+        ],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+  }
+
+  /**
    * Valida se o usuário tem permissão para criar templates
    */
   private validateCreatePermission(user: JwtPayload): void {
