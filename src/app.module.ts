@@ -18,6 +18,7 @@ import { CurriculumImportModule } from './curriculum-import/curriculum-import.mo
 import { HealthModule } from './health/health.module';
 import { ReportsModule } from './reports/reports.module';
 import { MaterialRequestModule } from './material-request/material-request.module';
+import { LookupModule } from './lookup/lookup.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 import { AdminModule } from './admin/admin.module';
@@ -42,6 +43,7 @@ import { AdminModule } from './admin/admin.module';
     RedisCacheModule,
     MetricsModule,
     MaterialRequestModule,
+    LookupModule,
   ],
   controllers: [AppController],
   providers: [
