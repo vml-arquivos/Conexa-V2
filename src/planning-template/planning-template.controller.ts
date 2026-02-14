@@ -57,6 +57,17 @@ export class PlanningTemplateController {
    *
    * Acesso: Todos os usuários autenticados (filtrado por escopo)
    */
+  /**
+   * GET /planning-templates/cocris-defaults
+   * Retorna templates padrão COCRIS (sempre 200, nunca 404)
+   *
+   * Acesso: Todos os usuários autenticados
+   */
+  @Get('cocris-defaults')
+  getCocrisDefaults() {
+    return this.planningTemplateService.getCocrisDefaults();
+  }
+
   @Get()
   findAll(
     @Query() query: QueryPlanningTemplateDto,
