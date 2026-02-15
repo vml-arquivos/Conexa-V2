@@ -1,74 +1,75 @@
-import { PrismaClient } from '@prisma/client';
-import * as XLSX from 'xlsx';
+import { PrismaClient, EnrollmentStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as path from 'path';
+import * as fs from 'fs';
 
 const prisma = new PrismaClient();
 
-const EXCEL_PATH = path.join(__dirname, '../../data/ALUNOS2026.xlsx');
-const UNIT_CODE = 'ARARA-CAN';
+const JSON_PATH = path.join(__dirname, '../../data/arara-2026-alunos.json');
 const DEFAULT_PASSWORD = 'Cocris@2026';
 
-interface ExcelRow {
-  TURMA: string;
-  PROFESSORA: string;
-  NOME: string;
-  'DATA DE NASCIMENTO': string | number;
-  SITUAÇÃO: string;
+interface TurmaData {
+  nome: string;
+  code: string;
+  capacity: number;
+  ageGroupMin: number;
+  ageGroupMax: number;
+  professora: string;
+}
+
+interface AlunoData {
+  turma: string;
+  nome: string;
+  dataNascimento: string;
+  situacao: string;
+}
+
+interface ImportData {
+  unitCode: string;
+  year: number;
+  turmas: TurmaData[];
+  alunos: AlunoData[];
 }
 
 async function main() {
   console.log('🚀 Iniciando importação CEPI Arara Canindé 2026...\n');
 
-  // 1. Buscar unidade ARARA-CAN
+  // 1. Ler arquivo JSON
+  console.log(`📄 Lendo arquivo: ${JSON_PATH}`);
+  if (!fs.existsSync(JSON_PATH)) {
+    throw new Error(`❌ Arquivo não encontrado: ${JSON_PATH}`);
+  }
+
+  const rawData = fs.readFileSync(JSON_PATH, 'utf-8');
+  const data: ImportData = JSON.parse(rawData);
+
+  console.log(
+    `✅ Dados carregados: ${data.turmas.length} turmas, ${data.alunos.length} alunos\n`,
+  );
+
+  // 2. Buscar unidade
   const unit = await prisma.unit.findFirst({
-    where: { code: UNIT_CODE },
+    where: { code: data.unitCode },
     include: { mantenedora: true },
   });
 
   if (!unit) {
-    throw new Error(`❌ Unidade ${UNIT_CODE} não encontrada. Execute ensure-cocris-units.ts primeiro.`);
+    throw new Error(
+      `❌ Unidade ${data.unitCode} não encontrada. Execute ensure-cocris-units.ts primeiro.`,
+    );
   }
 
   console.log(`✅ Unidade: ${unit.name} (${unit.id})`);
   console.log(`   Mantenedora: ${unit.mantenedora.name}\n`);
 
-  // 2. Ler planilha Excel
-  console.log(`📄 Lendo planilha: ${EXCEL_PATH}`);
-  const workbook = XLSX.readFile(EXCEL_PATH);
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  const rows: ExcelRow[] = XLSX.utils.sheet_to_json(worksheet);
-
-  console.log(`   Total de linhas: ${rows.length}\n`);
-
-  // 3. Extrair turmas e professoras únicas
-  const turmasSet = new Set<string>();
-  const professorasSet = new Set<string>();
-
-  rows.forEach((row) => {
-    if (row.TURMA) turmasSet.add(row.TURMA.trim());
-    if (row.PROFESSORA) professorasSet.add(row.PROFESSORA.trim());
-  });
-
-  const turmas = Array.from(turmasSet).sort();
-  const professoras = Array.from(professorasSet).sort();
-
-  console.log(`📊 Estatísticas:`);
-  console.log(`   - Turmas: ${turmas.length}`);
-  console.log(`   - Professoras: ${professoras.length}`);
-  console.log(`   - Alunos: ${rows.length}\n`);
-
-  // 4. Criar/atualizar turmas
-  console.log('📚 Criando turmas...');
+  // 3. Criar/atualizar turmas
+  console.log('📚 Criando/atualizando turmas...');
   const turmaMap = new Map<string, string>(); // nome -> id
 
-  for (const turmaNome of turmas) {
-    const code = turmaNome.toUpperCase().replace(/\s+/g, '-');
-    
+  for (const turmaData of data.turmas) {
     let classroom = await prisma.classroom.findFirst({
       where: {
-        code,
+        code: turmaData.code,
         unitId: unit.id,
       },
     });
@@ -76,37 +77,58 @@ async function main() {
     if (!classroom) {
       classroom = await prisma.classroom.create({
         data: {
-          code,
-          name: turmaNome,
+          code: turmaData.code,
+          name: turmaData.nome,
           unitId: unit.id,
-          capacity: 20, // Default
-          ageGroupMin: 0,
-          ageGroupMax: 5,
+          capacity: turmaData.capacity,
+          ageGroupMin: turmaData.ageGroupMin,
+          ageGroupMax: turmaData.ageGroupMax,
         },
       });
-      console.log(`   ✅ Criada: ${turmaNome} (${code})`);
+      console.log(`   ✅ Criada: ${turmaData.nome} (${turmaData.code})`);
     } else {
-      console.log(`   🔄 Existente: ${turmaNome} (${code})`);
+      // Atualizar capacidade e faixa etária se necessário
+      await prisma.classroom.update({
+        where: { id: classroom.id },
+        data: {
+          capacity: turmaData.capacity,
+          ageGroupMin: turmaData.ageGroupMin,
+          ageGroupMax: turmaData.ageGroupMax,
+        },
+      });
+      console.log(`   🔄 Atualizada: ${turmaData.nome} (${turmaData.code})`);
     }
 
-    turmaMap.set(turmaNome, classroom.id);
+    turmaMap.set(turmaData.nome, classroom.id);
   }
 
-  // 5. Criar professoras (Users)
-  console.log('\n👩‍🏫 Criando professoras...');
+  // 4. Criar professoras (Users)
+  console.log('\n👩‍🏫 Criando/atualizando professoras...');
   const professoraMap = new Map<string, string>(); // nome -> userId
   const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
 
-  for (const professoraNome of professoras) {
-    const [firstName, ...lastNameParts] = professoraNome.split(' ');
-    const lastName = lastNameParts.join(' ') || 'Silva';
-    const email = `${firstName.toLowerCase()}.${lastName.toLowerCase().split(' ')[0]}@cocris.org.br`.replace(/[áàâã]/g, 'a').replace(/[éèê]/g, 'e').replace(/[íì]/g, 'i').replace(/[óòôõ]/g, 'o').replace(/[úù]/g, 'u').replace(/ç/g, 'c');
+  const professorasUnicas = Array.from(
+    new Set(data.turmas.map((t) => t.professora)),
+  );
+
+  for (const professoraNome of professorasUnicas) {
+    const email = professoraNome
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/\s+/g, '.')
+      .concat('@cocris.edu.br');
 
     let user = await prisma.user.findUnique({
       where: { email },
     });
 
     if (!user) {
+      // Separar firstName e lastName
+      const nameParts = professoraNome.split(' ');
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(' ') || nameParts[0];
+
       user = await prisma.user.create({
         data: {
           email,
@@ -114,21 +136,8 @@ async function main() {
           firstName,
           lastName,
           mantenedoraId: unit.mantenedoraId,
-          unitId: unit.id,
-          status: 'ATIVO',
         },
       });
-
-      // Criar role PROFESSOR
-      await prisma.userRole.create({
-        data: {
-          userId: user.id,
-          roleId: 'PROFESSOR', // Placeholder
-          scopeLevel: 'PROFESSOR',
-          isActive: true,
-        },
-      });
-
       console.log(`   ✅ Criada: ${professoraNome} (${email})`);
     } else {
       console.log(`   🔄 Existente: ${professoraNome} (${email})`);
@@ -137,108 +146,98 @@ async function main() {
     professoraMap.set(professoraNome, user.id);
   }
 
-  // 6. Vincular professoras às turmas (ClassroomTeacher)
-  console.log('\n🔗 Vinculando professoras às turmas...');
-  const turmasProfessoras = new Map<string, string>(); // turma -> professora
+  // 5. Atribuir professoras às turmas
+  console.log('\n🔗 Atribuindo professoras às turmas...');
+  for (const turmaData of data.turmas) {
+    const classroomId = turmaMap.get(turmaData.nome);
+    const teacherId = professoraMap.get(turmaData.professora);
 
-  rows.forEach((row) => {
-    if (row.TURMA && row.PROFESSORA) {
-      turmasProfessoras.set(row.TURMA.trim(), row.PROFESSORA.trim());
+    if (!classroomId || !teacherId) {
+      console.log(
+        `   ⚠️  Pulando ${turmaData.nome} - turma ou professora não encontrada`,
+      );
+      continue;
     }
-  });
 
-  for (const [turmaNome, professoraNome] of turmasProfessoras) {
-    const classroomId = turmaMap.get(turmaNome);
-    const teacherId = professoraMap.get(professoraNome);
-
-    if (!classroomId || !teacherId) continue;
-
-    const existing = await prisma.classroomTeacher.findFirst({
+    // Verificar se já existe atribuição
+    const existingAssignment = await prisma.classroomTeacher.findFirst({
       where: {
         classroomId,
         teacherId,
       },
     });
 
-    if (!existing) {
+    if (!existingAssignment) {
       await prisma.classroomTeacher.create({
         data: {
           classroomId,
           teacherId,
           role: 'MAIN',
-          isActive: true,
         },
       });
-      console.log(`   ✅ ${turmaNome} → ${professoraNome}`);
+      console.log(
+        `   ✅ ${turmaData.professora} → ${turmaData.nome}`,
+      );
+    } else {
+      console.log(
+        `   🔄 Existente: ${turmaData.professora} → ${turmaData.nome}`,
+      );
     }
   }
 
-  // 7. Criar alunos (Child) e matrículas (Enrollment)
-  console.log('\n👶 Criando alunos e matrículas...');
-  let alunosCreated = 0;
-  let alunosSkipped = 0;
+  // 6. Criar crianças (Child)
+  console.log('\n👶 Criando/atualizando crianças...');
+  let createdCount = 0;
+  let updatedCount = 0;
 
-  for (const row of rows) {
-    if (!row.NOME || !row.TURMA) {
-      alunosSkipped++;
-      continue;
-    }
-
-    const childName = row.NOME.trim();
-    const [firstName, ...lastNameParts] = childName.split(' ');
-    const lastName = lastNameParts.join(' ') || 'Silva';
-    const turmaNome = row.TURMA.trim();
-    const situacao = row.SITUAÇÃO?.toString().toUpperCase() || 'MATRICULADA';
-    const classroomId = turmaMap.get(turmaNome);
+  for (const alunoData of data.alunos) {
+    const classroomId = turmaMap.get(alunoData.turma);
 
     if (!classroomId) {
-      console.log(`   ⚠️  Turma não encontrada para: ${childName}`);
-      alunosSkipped++;
+      console.log(`   ⚠️  Pulando ${alunoData.nome} - turma não encontrada`);
       continue;
     }
 
-    // Parse data de nascimento
-    let birthDate: Date | null = null;
-    if (row['DATA DE NASCIMENTO']) {
-      try {
-        const dateValue = row['DATA DE NASCIMENTO'];
-        if (typeof dateValue === 'number') {
-          // Excel serial date
-          const excelEpoch = new Date(1899, 11, 30);
-          birthDate = new Date(excelEpoch.getTime() + dateValue * 86400000);
-        } else {
-          birthDate = new Date(dateValue);
-        }
-      } catch (e) {
-        console.log(`   ⚠️  Data inválida para: ${childName}`);
-      }
-    }
+    const birthDate = new Date(alunoData.dataNascimento);
 
-    // Verificar se aluno já existe (por nome + unidade)
-    let child = await prisma.child.findFirst({
+    // Separar firstName e lastName
+    const nameParts = alunoData.nome.split(' ');
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(' ') || nameParts[0];
+
+    // Verificar se criança já existe (por firstName + lastName + birthDate + unidade)
+    const existingChild = await prisma.child.findFirst({
       where: {
         firstName,
         lastName,
-        mantenedoraId: unit.mantenedoraId,
+        dateOfBirth: birthDate,
+        unitId: unit.id,
       },
     });
 
-    if (!child) {
-      child = await prisma.child.create({
+    let childId: string;
+
+    if (!existingChild) {
+      const newChild = await prisma.child.create({
         data: {
           firstName,
           lastName,
-          dateOfBirth: birthDate || new Date('2020-01-01'),
-          mantenedoraId: unit.mantenedoraId,
+          dateOfBirth: birthDate,
           unitId: unit.id,
+          mantenedoraId: unit.mantenedoraId,
         },
       });
+      childId = newChild.id;
+      createdCount++;
+    } else {
+      childId = existingChild.id;
+      updatedCount++;
     }
 
-    // Verificar se matrícula já existe
+    // Criar ou atualizar enrollment
     const existingEnrollment = await prisma.enrollment.findFirst({
       where: {
-        childId: child.id,
+        childId,
         classroomId,
       },
     });
@@ -246,29 +245,47 @@ async function main() {
     if (!existingEnrollment) {
       await prisma.enrollment.create({
         data: {
-          childId: child.id,
+          childId,
           classroomId,
-          status: situacao.includes('CANCELADO') ? 'CANCELADA' : 'ATIVA',
-          enrollmentDate: new Date('2026-01-01'),
+          enrollmentDate: new Date(`${data.year}-02-01`),
+          status:
+            alunoData.situacao === 'ATIVO'
+              ? EnrollmentStatus.ATIVA
+              : EnrollmentStatus.CANCELADA,
         },
       });
-      alunosCreated++;
     } else {
-      alunosSkipped++;
+      // Atualizar status se mudou
+      await prisma.enrollment.update({
+        where: { id: existingEnrollment.id },
+        data: {
+          status:
+            alunoData.situacao === 'ATIVO'
+              ? EnrollmentStatus.ATIVA
+              : EnrollmentStatus.CANCELADA,
+        },
+      });
     }
   }
 
-  console.log(`\n📊 Resumo final:`);
-  console.log(`   - Turmas criadas/atualizadas: ${turmas.length}`);
-  console.log(`   - Professoras criadas/atualizadas: ${professoras.length}`);
-  console.log(`   - Alunos criados: ${alunosCreated}`);
-  console.log(`   - Alunos ignorados (duplicados): ${alunosSkipped}`);
-  console.log(`\n✅ Importação concluída!`);
+  console.log(`   ✅ Criados: ${createdCount}`);
+  console.log(`   🔄 Atualizados: ${updatedCount}`);
+
+  // 7. Roles serão atribuídos pelo script create-urgent-logins.ts
+  console.log('\n✅ Professoras criadas. Execute create-urgent-logins.ts para atribuir roles.');
+
+  console.log('\n✅ Importação concluída com sucesso!');
+  console.log(`\n📊 Resumo:`);
+  console.log(`   - Turmas: ${data.turmas.length}`);
+  console.log(`   - Professoras: ${professorasUnicas.length}`);
+  console.log(`   - Crianças criadas: ${createdCount}`);
+  console.log(`   - Crianças atualizadas: ${updatedCount}`);
+  console.log(`\n🔐 Senha padrão: ${DEFAULT_PASSWORD}`);
 }
 
 main()
-  .catch((e) => {
-    console.error('❌ Erro:', e);
+  .catch((error) => {
+    console.error('❌ Erro na importação:', error);
     process.exit(1);
   })
   .finally(async () => {
