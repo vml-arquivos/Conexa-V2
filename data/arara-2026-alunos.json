@@ -1,0 +1,164 @@
+{
+  "unitCode": "ARARA-CAN",
+  "year": 2026,
+  "turmas": [
+    {
+      "nome": "Berçário I",
+      "code": "BERCARIO-I",
+      "capacity": 12,
+      "ageGroupMin": 0,
+      "ageGroupMax": 1,
+      "professora": "Maria Silva"
+    },
+    {
+      "nome": "Berçário II",
+      "code": "BERCARIO-II",
+      "capacity": 15,
+      "ageGroupMin": 1,
+      "ageGroupMax": 2,
+      "professora": "Ana Santos"
+    },
+    {
+      "nome": "Maternal I",
+      "code": "MATERNAL-I",
+      "capacity": 18,
+      "ageGroupMin": 2,
+      "ageGroupMax": 3,
+      "professora": "Joana Oliveira"
+    },
+    {
+      "nome": "Maternal II",
+      "code": "MATERNAL-II",
+      "capacity": 20,
+      "ageGroupMin": 3,
+      "ageGroupMax": 4,
+      "professora": "Carla Souza"
+    },
+    {
+      "nome": "Pré-escola I",
+      "code": "PRE-I",
+      "capacity": 22,
+      "ageGroupMin": 4,
+      "ageGroupMax": 5,
+      "professora": "Paula Costa"
+    },
+    {
+      "nome": "Pré-escola II",
+      "code": "PRE-II",
+      "capacity": 22,
+      "ageGroupMin": 5,
+      "ageGroupMax": 6,
+      "professora": "Fernanda Lima"
+    }
+  ],
+  "alunos": [
+    {
+      "turma": "Berçário I",
+      "nome": "João Pedro Silva",
+      "dataNascimento": "2025-06-15",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Berçário I",
+      "nome": "Maria Eduarda Santos",
+      "dataNascimento": "2025-07-20",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Berçário I",
+      "nome": "Lucas Gabriel Oliveira",
+      "dataNascimento": "2025-05-10",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Berçário II",
+      "nome": "Ana Clara Costa",
+      "dataNascimento": "2024-08-12",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Berçário II",
+      "nome": "Pedro Henrique Lima",
+      "dataNascimento": "2024-09-25",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Berçário II",
+      "nome": "Sofia Almeida",
+      "dataNascimento": "2024-07-30",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Maternal I",
+      "nome": "Miguel Ferreira",
+      "dataNascimento": "2023-10-05",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Maternal I",
+      "nome": "Alice Rodrigues",
+      "dataNascimento": "2023-11-18",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Maternal I",
+      "nome": "Gabriel Martins",
+      "dataNascimento": "2023-09-22",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Maternal II",
+      "nome": "Laura Pereira",
+      "dataNascimento": "2022-12-08",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Maternal II",
+      "nome": "Davi Souza",
+      "dataNascimento": "2022-11-14",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Maternal II",
+      "nome": "Isabela Carvalho",
+      "dataNascimento": "2022-10-20",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Pré-escola I",
+      "nome": "Rafael Gomes",
+      "dataNascimento": "2021-03-15",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Pré-escola I",
+      "nome": "Valentina Ribeiro",
+      "dataNascimento": "2021-04-22",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Pré-escola I",
+      "nome": "Enzo Barbosa",
+      "dataNascimento": "2021-02-10",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Pré-escola II",
+      "nome": "Helena Dias",
+      "dataNascimento": "2020-05-18",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Pré-escola II",
+      "nome": "Arthur Moreira",
+      "dataNascimento": "2020-06-25",
+      "situacao": "ATIVO"
+    },
+    {
+      "turma": "Pré-escola II",
+      "nome": "Manuela Araújo",
+      "dataNascimento": "2020-04-12",
+      "situacao": "ATIVO"
+    }
+  ]
+}
