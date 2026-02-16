@@ -5,8 +5,36 @@ import * as fs from 'fs';
 
 const prisma = new PrismaClient();
 
-const JSON_PATH = path.join(__dirname, '../../data/arara-2026-alunos.json');
 const DEFAULT_PASSWORD = 'Cocris@2026';
+
+/**
+ * Encontra o path do dataset com fallback robusto para produção
+ * Tenta múltiplos caminhos possíveis:
+ * 1. /app/dist/data (produção - após build)
+ * 2. /app/data (produção - fallback)
+ * 3. ../../data (desenvolvimento - relativo ao script compilado)
+ */
+function findDatasetPath(filename: string): string {
+  const candidates = [
+    path.join('/app/dist/data', filename),
+    path.join('/app/data', filename),
+    path.join(__dirname, '../../data', filename),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      console.log(`✅ Dataset found: ${candidate}`);
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    `❌ Dataset not found: ${filename}\n` +
+    `Tried paths:\n${candidates.map(p => `  - ${p}`).join('\n')}`
+  );
+}
+
+const JSON_PATH = findDatasetPath('arara-2026-alunos.json');
 
 interface TurmaData {
   nome: string;
