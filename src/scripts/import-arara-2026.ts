@@ -8,30 +8,34 @@ const prisma = new PrismaClient();
 const DEFAULT_PASSWORD = 'Cocris@2026';
 
 /**
- * Encontra o path do dataset com fallback robusto para produção
- * Tenta múltiplos caminhos possíveis:
- * 1. /app/dist/data (produção - após build)
- * 2. /app/data (produção - fallback)
- * 3. ../../data (desenvolvimento - relativo ao script compilado)
+ * Encontra o path do dataset com fallback robusto para todos os ambientes
+ * Ordem de tentativa:
+ * 1. ../../data (desenvolvimento - TS local)
+ * 2. ../data (dist padrão - após build)
+ * 3. /app/dist/data (Docker - após build)
+ * 4. /app/data (Docker - raiz)
  */
 function findDatasetPath(filename: string): string {
   const candidates = [
-    path.join('/app/dist/data', filename),
-    path.join('/app/data', filename),
-    path.join(__dirname, '../../data', filename),
+    path.resolve(__dirname, '../../data', filename),  // TS local
+    path.resolve(__dirname, '../data', filename),     // dist padrão
+    path.join('/app/dist/data', filename),            // Docker dist
+    path.join('/app/data', filename),                 // Docker raiz
   ];
 
+  console.log(`🔍 Searching for dataset: ${filename}`);
+  
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
-      console.log(`✅ Dataset found: ${candidate}`);
+      console.log(`🚀 Lendo dados de: ${candidate}`);
       return candidate;
     }
   }
 
-  throw new Error(
-    `❌ Dataset not found: ${filename}\n` +
-    `Tried paths:\n${candidates.map(p => `  - ${p}`).join('\n')}`
-  );
+  console.error(`❌ Dataset not found: ${filename}`);
+  console.error(`Tried paths:`);
+  candidates.forEach(p => console.error(`  - ${p}`));
+  process.exit(1);
 }
 
 const JSON_PATH = findDatasetPath('arara-2026-alunos.json');
