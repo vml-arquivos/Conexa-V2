@@ -4,7 +4,7 @@
   "description": "_Gerado por MANUZ, IA Engenheira de Software Sênior._",
   "main": "index.js",
   "scripts": {
-    "build": "nest build",
+    "build": "nest build && node scripts/copy-data-to-dist.js",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
