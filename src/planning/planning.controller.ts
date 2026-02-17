@@ -28,6 +28,32 @@ export class PlanningController {
   constructor(private readonly planningService: PlanningService) {}
 
   /**
+   * POST /plannings/from-template
+   * Cria um planejamento inteligente a partir de um template,
+   * pré-preenchendo com dados da matriz curricular
+   *
+   * Body:
+   * - templateId: ID do template
+   * - classroomId: ID da turma
+   * - date: Data do planejamento (ISO string)
+   *
+   * Acesso:
+   * - Professor: pode criar planejamentos para suas turmas
+   * - Coordenação/Direção: pode criar planejamentos na unidade
+   * - Staff Central: pode criar planejamentos nas unidades vinculadas
+   * - Mantenedora: pode criar planejamentos em qualquer unidade
+   * - Developer: acesso total
+   */
+  @Post('from-template')
+  @HttpCode(HttpStatus.CREATED)
+  createFromTemplate(
+    @Body() dto: { templateId: string; classroomId: string; date: string },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.planningService.createFromTemplate(dto, user);
+  }
+
+  /**
    * POST /plannings
    * Cria um novo planejamento
    *

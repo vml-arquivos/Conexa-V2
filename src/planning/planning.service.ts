@@ -23,6 +23,129 @@ export class PlanningService {
   ) {}
 
   /**
+   * Cria um planejamento inteligente a partir de um template,
+   * pré-preenchendo com dados da matriz curricular
+   */
+  async createFromTemplate(
+    dto: { templateId: string; classroomId: string; date: string },
+    user: JwtPayload,
+  ) {
+    // 1. Validar template
+    const template = await this.prisma.planningTemplate.findUnique({
+      where: { id: dto.templateId },
+    });
+
+    if (!template) {
+      throw new NotFoundException('Template não encontrado');
+    }
+
+    // 2. Validar classroom
+    const classroom = await this.prisma.classroom.findUnique({
+      where: { id: dto.classroomId },
+      include: { unit: true },
+    });
+
+    if (!classroom) {
+      throw new NotFoundException('Turma não encontrada');
+    }
+
+    // 3. Buscar matriz curricular ativa da mantenedora
+    const matriz = await this.prisma.curriculumMatrix.findFirst({
+      where: {
+        mantenedoraId: user.mantenedoraId,
+        isActive: true,
+      },
+      orderBy: { year: 'desc' },
+    });
+
+    if (!matriz) {
+      throw new NotFoundException(
+        'Matriz curricular ativa não encontrada para sua mantenedora',
+      );
+    }
+
+    // 4. Buscar entrada da matriz para a data
+    const targetDate = new Date(dto.date);
+
+    const matrixEntry = await this.prisma.curriculumMatrixEntry.findFirst({
+      where: {
+        matrixId: matriz.id,
+        date: targetDate,
+      },
+    });
+
+    // 5. Montar dados do planejamento
+    let title = `${template.name} - ${classroom.name} - ${targetDate.toLocaleDateString('pt-BR')}`;
+    let description = template.description || '';
+    let content: any = {};
+
+    if (matrixEntry) {
+      title = `${matrixEntry.campoDeExperiencia} - ${classroom.name} - ${targetDate.toLocaleDateString('pt-BR')}`;
+      description = matrixEntry.intencionalidade || '';
+      content = {
+        campoDeExperiencia: matrixEntry.campoDeExperiencia,
+        objetivoBNCCCode: matrixEntry.objetivoBNCCCode,
+        objetivoBNCC: matrixEntry.objetivoBNCC,
+        objetivoCurriculo: matrixEntry.objetivoCurriculo,
+        intencionalidade: matrixEntry.intencionalidade,
+        exemploAtividade: matrixEntry.exemploAtividade,
+        weekOfYear: matrixEntry.weekOfYear,
+        bimester: matrixEntry.bimester,
+        activities: '',
+        materials: '',
+        evaluation: '',
+      };
+    } else {
+      content = {
+        campoDeExperiencia: '',
+        objetivoBNCCCode: '',
+        objetivoBNCC: '',
+        objetivoCurriculo: '',
+        intencionalidade: '',
+        exemploAtividade: '',
+        activities: '',
+        materials: '',
+        evaluation: '',
+      };
+    }
+
+    // 6. Criar planejamento
+    const planning = await this.prisma.planning.create({
+      data: {
+        mantenedoraId: user.mantenedoraId,
+        unitId: classroom.unitId,
+        classroomId: classroom.id,
+        type: 'DIARIO' as any,
+        createdBy: user.email,
+        templateId: template.id,
+        curriculumMatrixId: matriz.id,
+        title,
+        description,
+        pedagogicalContent: content,
+        startDate: targetDate,
+        endDate: targetDate,
+        status: PlanningStatus.RASCUNHO,
+      },
+      include: {
+        classroom: true,
+        template: true,
+      },
+    });
+
+    // 7. Auditar
+    await this.auditService.log({
+      userId: user.sub,
+      mantenedoraId: user.mantenedoraId,
+      action: AuditLogAction.CREATE,
+      entity: 'Planning',
+      entityId: planning.id,
+      description: `Planejamento criado a partir do template ${template.name} para data ${dto.date}`,
+    });
+
+    return planning;
+  }
+
+  /**
    * Cria um novo planejamento
    */
   async create(createDto: CreatePlanningDto, user: JwtPayload) {

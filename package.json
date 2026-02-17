@@ -15,7 +15,8 @@
     "db:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
     "snapshot:manifest": "bash scripts/snapshot-manifest.sh",
-    "test": "jest"
+    "test": "jest",
+    "seed:matriz-2026": "ts-node src/scripts/seed-matriz-2026.ts"
   },
   "repository": {
     "type": "git",
