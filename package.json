@@ -16,11 +16,11 @@
     "db:seed": "ts-node prisma/seed.ts",
     "snapshot:manifest": "bash scripts/snapshot-manifest.sh",
     "test": "jest",
-    "seed:matriz-2026": "ts-node src/scripts/seed-matriz-2026.ts",
-    "seed:ensure-cocris-units": "ts-node src/scripts/ensure-cocris-units.ts",
-    "seed:import-arara-2026": "ts-node src/scripts/import-arara-2026.ts",
-    "seed:create-urgent-logins": "ts-node src/scripts/create-urgent-logins.ts",
-    "seed:arara-demo-data": "ts-node src/scripts/seed-arara-demo-data.ts"
+    "seed:matriz-2026": "node dist/src/scripts/seed-matriz-2026.js",
+    "seed:ensure-cocris-units": "node dist/src/scripts/ensure-cocris-units.js",
+    "seed:import-arara-2026": "node dist/src/scripts/import-arara-2026.js",
+    "seed:create-urgent-logins": "node dist/src/scripts/create-urgent-logins.js",
+    "seed:arara-demo-data": "node dist/src/scripts/seed-arara-demo-data.js"
   },
   "repository": {
     "type": "git",
