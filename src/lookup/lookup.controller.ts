@@ -4,13 +4,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { TenantCacheInterceptor } from '../cache/tenant-cache.interceptor';
 import { CacheTTL } from '@nestjs/cache-manager';
-
-interface UserPayload {
-  userId: string;
-  mantenedoraId: string;
-  unitId: string | null;
-  roleLevel: string;
-}
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 @Controller('lookup')
 @UseGuards(JwtAuthGuard)
@@ -20,24 +14,16 @@ export class LookupController {
   constructor(private readonly lookupService: LookupService) {}
 
   @Get('units/accessible')
-  async getAccessibleUnits(@CurrentUser() user: UserPayload) {
-    return this.lookupService.getAccessibleUnits(
-      user.mantenedoraId,
-      user.unitId,
-      user.roleLevel as any,
-    );
+  async getAccessibleUnits(@CurrentUser() user: JwtPayload) {
+    return this.lookupService.getAccessibleUnits(user);
   }
 
   @Get('classrooms/accessible')
   async getAccessibleClassrooms(
-    @CurrentUser() user: UserPayload,
+    @CurrentUser() user: JwtPayload,
     @Query('unitId') unitId?: string,
   ) {
-    return this.lookupService.getAccessibleClassrooms(
-      unitId,
-      user.userId,
-      user.roleLevel as any,
-    );
+    return this.lookupService.getAccessibleClassrooms(user, unitId);
   }
 
   @Get('teachers/accessible')
