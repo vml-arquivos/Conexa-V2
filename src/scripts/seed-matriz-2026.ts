@@ -60,13 +60,13 @@ async function main() {
   console.log(`   Year: ${matrizData.metadata.year}`);
   console.log(`   Version: ${matrizData.metadata.version}\n`);
 
-  // Buscar mantenedora COCRIS
+  // Buscar mantenedora Conexa (criada pelo seed:ensure-cocris-units)
   const mantenedora = await prisma.mantenedora.findFirst({
-    where: { name: { contains: 'COCRIS', mode: 'insensitive' } },
+    where: { name: { contains: 'Conexa', mode: 'insensitive' } },
   });
 
   if (!mantenedora) {
-    console.error('❌ Mantenedora COCRIS não encontrada. Execute seed:ensure-cocris-units primeiro.');
+    console.error('❌ Mantenedora Conexa não encontrada. Execute seed:ensure-cocris-units primeiro.');
     process.exit(1);
   }
 
