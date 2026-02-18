@@ -250,18 +250,20 @@ model Mantenedora {
   updatedBy String?  @db.VarChar(255)
 
   // Relações
-  units              Unit[]
-  users              User[]
-  roles              Role[]
-  children           Child[]
-  curriculumMatrices CurriculumMatrix[]
-  plannings          Planning[]
-  diaryEvents        DiaryEvent[]
-  attendances        Attendance[]
-  materialRequests   MaterialRequest[]
-  reportBases        ReportBase[]
-  aiContexts         AIContext[]
-  auditLogs          AuditLog[]
+  units                Unit[]
+  users                User[]
+  roles                Role[]
+  children             Child[]
+  curriculumMatrices   CurriculumMatrix[]
+  plannings            Planning[]
+  diaryEvents          DiaryEvent[]
+  attendances          Attendance[]
+  materialRequests     MaterialRequest[]
+  reportBases          ReportBase[]
+  aiContexts           AIContext[]
+  auditLogs            AuditLog[]
+  pedidosCompra        PedidoCompra[]
+  solicitacoesCorrecao SolicitacaoCorrecao[]
 
   @@index([cnpj])
   @@index([isActive])
@@ -298,19 +300,21 @@ model Unit {
   updatedBy String?  @db.VarChar(255)
 
   // Relações
-  mantenedora        Mantenedora         @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
-  users              User[]
-  classrooms         Classroom[]
-  children           Child[]
-  plannings          Planning[]
-  diaryEvents        DiaryEvent[]
-  attendances        Attendance[]
-  materialRequests   MaterialRequest[]
-  stockItems         StockItem[]
-  reportBases        ReportBase[]
-  auditLogs          AuditLog[]
-  userRoleUnitScopes UserRoleUnitScope[]
-  aiContexts         AIContext[]
+  mantenedora          Mantenedora           @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  users                User[]
+  classrooms           Classroom[]
+  children             Child[]
+  plannings            Planning[]
+  diaryEvents          DiaryEvent[]
+  attendances          Attendance[]
+  materialRequests     MaterialRequest[]
+  stockItems           StockItem[]
+  reportBases          ReportBase[]
+  auditLogs            AuditLog[]
+  userRoleUnitScopes   UserRoleUnitScope[]
+  pedidosCompra        PedidoCompra[]
+  solicitacoesCorrecao SolicitacaoCorrecao[]
+  aiContexts           AIContext[]
 
   dailyMetrics DailyMetric[]
 
@@ -1160,4 +1164,142 @@ model DailyMetric {
   @@unique([unitId, date, type])
   @@index([unitId, date])
   @@index([type, date])
+}
+
+// ============================================================================
+// 14. PEDIDO DE COMPRA (Unidade → Mantenedora)
+// ============================================================================
+
+/// Status do pedido de compra consolidado pela unidade
+enum StatusPedidoCompra {
+  RASCUNHO
+  ENVIADO
+  EM_ANALISE
+  COMPRADO
+  EM_ENTREGA
+  ENTREGUE
+  CANCELADO
+}
+
+/// Pedido de Compra consolidado mensalmente pela unidade para a mantenedora
+model PedidoCompra {
+  id            String @id @default(cuid())
+  mantenedoraId String
+  unitId        String
+
+  /// Mês/ano de referência (ex.: 2026-03)
+  mesReferencia String @db.VarChar(7)
+
+  /// Status do pedido
+  status StatusPedidoCompra @default(RASCUNHO)
+
+  /// Observações da unidade
+  observacoes String? @db.Text
+
+  /// Quem consolidou
+  consolidadoPor String? @db.VarChar(255)
+
+  /// Timestamps
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+  enviadoEm    DateTime?
+  entregueEm   DateTime?
+
+  /// Relações
+  mantenedora Mantenedora        @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  unit        Unit               @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  itens       ItemPedidoCompra[]
+
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([mesReferencia])
+  @@index([status])
+}
+
+/// Item individual de um pedido de compra
+model ItemPedidoCompra {
+  id             String @id @default(cuid())
+  pedidoCompraId String
+
+  /// Categoria do item
+  categoria MaterialRequestType
+
+  /// Descrição do item
+  descricao String @db.VarChar(255)
+
+  /// Quantidade solicitada
+  quantidade Int
+
+  /// Unidade de medida (unidade, caixa, pacote, etc.)
+  unidadeMedida String? @db.VarChar(50)
+
+  /// Custo estimado
+  custoEstimado Float?
+
+  /// Requisições de material que originaram este item
+  requisicaoIds Json?
+
+  /// Timestamps
+  criadoEm DateTime @default(now())
+
+  /// Relação
+  pedidoCompra PedidoCompra @relation(fields: [pedidoCompraId], references: [id], onDelete: Cascade)
+
+  @@index([pedidoCompraId])
+  @@index([categoria])
+}
+
+// ============================================================================
+// 15. SOLICITAÇÃO DE CORREÇÃO (Central/Unidade → Professor)
+// ============================================================================
+
+/// Status da solicitação de correção
+enum StatusSolicitacaoCorrecao {
+  PENDENTE
+  EM_REVISAO
+  RESOLVIDA
+  CANCELADA
+}
+
+/// Tipo de conteúdo alvo da correção
+enum TipoAlvoCorrecao {
+  DIARIO
+  PLANEJAMENTO
+  RELATORIO
+  CADASTRO_ALUNO
+  OUTRO
+}
+
+/// Solicitação de correção enviada por Central ou Unidade ao autor (professor)
+model SolicitacaoCorrecao {
+  id String @id @default(cuid())
+
+  mantenedoraId String
+  unitId        String
+
+  criadoPorId   String @db.VarChar(255)
+  responsavelId String @db.VarChar(255)
+
+  tipoAlvo TipoAlvoCorrecao
+  alvoId   String           @db.VarChar(255)
+
+  mensagem String @db.Text
+
+  status StatusSolicitacaoCorrecao @default(PENDENTE)
+
+  respostaResolucao String? @db.Text
+
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+  resolvidaEm  DateTime?
+
+  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  unit        Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([criadoPorId])
+  @@index([responsavelId])
+  @@index([status])
+  @@index([tipoAlvo, alvoId])
 }

@@ -177,4 +177,42 @@ export class AuthService {
   ): Promise<boolean> {
     return bcrypt.compare(plainPassword, hashedPassword);
   }
+
+  /**
+   * Retorna os dados do usuário autenticado — GET /auth/me
+   * Utilizado pelo frontend para carregar o perfil após login
+   */
+  async getMe(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        status: true,
+        mantenedoraId: true,
+        unitId: true,
+      },
+    });
+    if (!user) throw new UnauthorizedException('Usuário não encontrado');
+
+    // Buscar roles separadamente para evitar problemas de tipo
+    const userRoles = await this.prisma.userRole.findMany({
+      where: { userId, isActive: true },
+      select: { scopeLevel: true },
+    });
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        nome: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
+        status: user.status,
+        mantenedoraId: user.mantenedoraId,
+        unitId: user.unitId,
+        roles: userRoles.map((r) => r.scopeLevel),
+      },
+    };
+  }
 }
