@@ -37,45 +37,98 @@ const LABELS_TIPO: Record<TipoAtividade, string> = {
   [TipoAtividade.LIVRE]: 'Livre',
 };
 
+// ============================================================================
+// CONFIGURAÇÃO DO PROVEDOR DE IA
+// ============================================================================
+// O sistema usa a API do Google Gemini como padrão, via interface compatível
+// com OpenAI. Para trocar o provedor, basta alterar as variáveis de ambiente
+// no Coolify — sem necessidade de alterar o código.
+//
+// Variáveis de ambiente:
+//   GEMINI_API_KEY  → Chave da API do Google AI Studio (obrigatória para IA)
+//   GEMINI_BASE_URL → URL base (padrão: https://generativelanguage.googleapis.com/v1beta/openai/)
+//   GEMINI_MODEL    → Modelo (padrão: gemini-2.5-flash)
+//
+// Compatibilidade retroativa (se GEMINI_API_KEY não estiver definida, tenta OPENAI_API_KEY):
+//   OPENAI_API_KEY  → Chave da OpenAI (fallback)
+//   OPENAI_BASE_URL → URL base da OpenAI (fallback)
+//   OPENAI_MODEL    → Modelo da OpenAI (fallback)
+// ============================================================================
+
 @Injectable()
 export class IaAssistivaService {
   private readonly logger = new Logger(IaAssistivaService.name);
   // Inicialização LAZY: o cliente só é criado quando realmente for usado.
-  // Isso garante que o servidor sobe normalmente mesmo sem OPENAI_API_KEY configurada.
-  private _openai: OpenAI | null = null;
+  // Isso garante que o servidor sobe normalmente mesmo sem chave de IA configurada.
+  private _cliente: OpenAI | null = null;
 
   constructor() {
-    const chave = process.env.OPENAI_API_KEY;
-    if (chave) {
-      this.logger.log('IA Assistiva: OPENAI_API_KEY detectada — módulo de IA ativo.');
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+
+    if (geminiKey) {
+      this.logger.log(
+        'IA Assistiva: GEMINI_API_KEY detectada — usando Google Gemini como provedor de IA.',
+      );
+    } else if (openaiKey) {
+      this.logger.log(
+        'IA Assistiva: OPENAI_API_KEY detectada — usando OpenAI como provedor de IA (fallback).',
+      );
     } else {
       this.logger.warn(
-        'IA Assistiva: OPENAI_API_KEY não configurada — endpoints de IA retornarão 503 até a chave ser adicionada. O sistema funciona normalmente.',
+        'IA Assistiva: Nenhuma chave de IA configurada (GEMINI_API_KEY ou OPENAI_API_KEY). ' +
+        'O servidor funciona normalmente. Endpoints de IA retornarão 503 até uma chave ser adicionada.',
       );
     }
   }
 
   /**
-   * Retorna o cliente OpenAI, criando-o na primeira chamada (lazy).
-   * Lança ServiceUnavailableException se a chave não estiver configurada.
+   * Retorna o cliente de IA (lazy init).
+   * Prioridade: Gemini > OpenAI
+   * Lança ServiceUnavailableException se nenhuma chave estiver configurada.
    */
-  private getOpenAI(): OpenAI {
-    if (this._openai) return this._openai;
+  private getCliente(): OpenAI {
+    if (this._cliente) return this._cliente;
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      throw new ServiceUnavailableException(
-        'O módulo de IA ainda não está configurado neste ambiente. ' +
-        'Adicione a variável OPENAI_API_KEY nas configurações do servidor.',
-      );
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+
+    if (geminiKey) {
+      // Gemini via API compatível com OpenAI
+      this._cliente = new OpenAI({
+        apiKey: geminiKey,
+        baseURL:
+          process.env.GEMINI_BASE_URL ||
+          'https://generativelanguage.googleapis.com/v1beta/openai/',
+      });
+      return this._cliente;
     }
 
-    this._openai = new OpenAI({
-      apiKey,
-      baseURL: process.env.OPENAI_BASE_URL || undefined,
-    });
+    if (openaiKey) {
+      // OpenAI como fallback
+      this._cliente = new OpenAI({
+        apiKey: openaiKey,
+        baseURL: process.env.OPENAI_BASE_URL || undefined,
+      });
+      return this._cliente;
+    }
 
-    return this._openai;
+    throw new ServiceUnavailableException(
+      'O módulo de IA não está configurado neste ambiente. ' +
+      'Adicione a variável GEMINI_API_KEY nas configurações do servidor no Coolify.',
+    );
+  }
+
+  /**
+   * Retorna o nome do modelo a ser usado.
+   * Prioridade: GEMINI_MODEL > OPENAI_MODEL > gemini-2.5-flash (padrão)
+   */
+  private getModelo(): string {
+    return (
+      process.env.GEMINI_MODEL ||
+      process.env.OPENAI_MODEL ||
+      'gemini-2.5-flash'
+    );
   }
 
   /**
@@ -86,7 +139,7 @@ export class IaAssistivaService {
    * cria a atividade/experiência para atingir esses objetivos.
    */
   async gerarAtividade(dto: GerarAtividadeDto): Promise<AtividadeGerada> {
-    const openai = this.getOpenAI();
+    const cliente = this.getCliente();
     const faixaLabel = LABELS_FAIXA[dto.faixaEtaria] || dto.faixaEtaria;
     const tipoLabel = dto.tipoAtividade
       ? LABELS_TIPO[dto.tipoAtividade]
@@ -131,22 +184,18 @@ ${dto.contextoAdicional ? `- **Contexto Adicional:** ${dto.contextoAdicional}` :
 }`;
 
     try {
-      const resposta = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+      const resposta = await cliente.chat.completions.create({
+        model: this.getModelo(),
         messages: [
           {
             role: 'system',
             content:
               'Você é uma especialista em Educação Infantil brasileira. Responda APENAS com JSON válido, sem markdown, sem texto adicional.',
           },
-          {
-            role: 'user',
-            content: prompt,
-          },
+          { role: 'user', content: prompt },
         ],
         temperature: 0.7,
         max_tokens: 1500,
-        response_format: { type: 'json_object' },
       });
 
       const conteudo = resposta.choices[0]?.message?.content;
@@ -156,7 +205,13 @@ ${dto.contextoAdicional ? `- **Contexto Adicional:** ${dto.contextoAdicional}` :
         );
       }
 
-      const atividade = JSON.parse(conteudo);
+      // Extrair JSON mesmo que venha com markdown
+      const jsonLimpo = conteudo
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+
+      const atividade = JSON.parse(jsonLimpo);
 
       // Garantir que os campos fixos da Sequência Piloto sejam preservados
       return {
@@ -186,7 +241,7 @@ ${dto.contextoAdicional ? `- **Contexto Adicional:** ${dto.contextoAdicional}` :
     observacoes: string;
     campoDeExperiencia: string;
   }): Promise<{ microgestos: string[]; justificativa: string }> {
-    const openai = this.getOpenAI();
+    const cliente = this.getCliente();
 
     const prompt = `Você é uma especialista em Educação Infantil e desenvolvimento infantil.
 
@@ -210,8 +265,8 @@ Responda em JSON:
 }`;
 
     try {
-      const resposta = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+      const resposta = await cliente.chat.completions.create({
+        model: this.getModelo(),
         messages: [
           {
             role: 'system',
@@ -222,14 +277,17 @@ Responda em JSON:
         ],
         temperature: 0.6,
         max_tokens: 800,
-        response_format: { type: 'json_object' },
       });
 
       const conteudo = resposta.choices[0]?.message?.content;
       if (!conteudo) {
         throw new ServiceUnavailableException('IA sem resposta. Tente novamente.');
       }
-      return JSON.parse(conteudo);
+      const jsonLimpo = conteudo
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+      return JSON.parse(jsonLimpo);
     } catch (error) {
       this.logger.error('Erro ao gerar microgestos:', error);
       if (error instanceof ServiceUnavailableException) throw error;
@@ -249,7 +307,7 @@ Responda em JSON:
     observacoes: string[];
     periodo: string;
   }): Promise<{ relatorio: string; pontosFortess: string[]; sugestoes: string[] }> {
-    const openai = this.getOpenAI();
+    const cliente = this.getCliente();
     const observacoesTexto = params.observacoes
       .map((o, i) => `${i + 1}. ${o}`)
       .join('\n');
@@ -272,8 +330,8 @@ Responda em JSON:
 }`;
 
     try {
-      const resposta = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+      const resposta = await cliente.chat.completions.create({
+        model: this.getModelo(),
         messages: [
           {
             role: 'system',
@@ -284,14 +342,17 @@ Responda em JSON:
         ],
         temperature: 0.5,
         max_tokens: 1200,
-        response_format: { type: 'json_object' },
       });
 
       const conteudo = resposta.choices[0]?.message?.content;
       if (!conteudo) {
         throw new ServiceUnavailableException('IA sem resposta. Tente novamente.');
       }
-      return JSON.parse(conteudo);
+      const jsonLimpo = conteudo
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+      return JSON.parse(jsonLimpo);
     } catch (error) {
       this.logger.error('Erro ao gerar relatório:', error);
       if (error instanceof ServiceUnavailableException) throw error;
