@@ -22,6 +22,7 @@ import { LookupModule } from './lookup/lookup.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AdminModule } from './admin/admin.module';
 import { PedidoCompraModule } from './pedido-compra/pedido-compra.module';
+import { IaAssistivaModule } from './ia-assistiva/ia-assistiva.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { PedidoCompraModule } from './pedido-compra/pedido-compra.module';
     MaterialRequestModule,
     LookupModule,
     PedidoCompraModule,
+    IaAssistivaModule,
   ],
   controllers: [AppController],
   providers: [
