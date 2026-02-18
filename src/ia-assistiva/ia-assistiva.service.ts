@@ -40,13 +40,42 @@ const LABELS_TIPO: Record<TipoAtividade, string> = {
 @Injectable()
 export class IaAssistivaService {
   private readonly logger = new Logger(IaAssistivaService.name);
-  private readonly openai: OpenAI;
+  // Inicialização LAZY: o cliente só é criado quando realmente for usado.
+  // Isso garante que o servidor sobe normalmente mesmo sem OPENAI_API_KEY configurada.
+  private _openai: OpenAI | null = null;
 
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+    const chave = process.env.OPENAI_API_KEY;
+    if (chave) {
+      this.logger.log('IA Assistiva: OPENAI_API_KEY detectada — módulo de IA ativo.');
+    } else {
+      this.logger.warn(
+        'IA Assistiva: OPENAI_API_KEY não configurada — endpoints de IA retornarão 503 até a chave ser adicionada. O sistema funciona normalmente.',
+      );
+    }
+  }
+
+  /**
+   * Retorna o cliente OpenAI, criando-o na primeira chamada (lazy).
+   * Lança ServiceUnavailableException se a chave não estiver configurada.
+   */
+  private getOpenAI(): OpenAI {
+    if (this._openai) return this._openai;
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new ServiceUnavailableException(
+        'O módulo de IA ainda não está configurado neste ambiente. ' +
+        'Adicione a variável OPENAI_API_KEY nas configurações do servidor.',
+      );
+    }
+
+    this._openai = new OpenAI({
+      apiKey,
       baseURL: process.env.OPENAI_BASE_URL || undefined,
     });
+
+    return this._openai;
   }
 
   /**
@@ -57,6 +86,7 @@ export class IaAssistivaService {
    * cria a atividade/experiência para atingir esses objetivos.
    */
   async gerarAtividade(dto: GerarAtividadeDto): Promise<AtividadeGerada> {
+    const openai = this.getOpenAI();
     const faixaLabel = LABELS_FAIXA[dto.faixaEtaria] || dto.faixaEtaria;
     const tipoLabel = dto.tipoAtividade
       ? LABELS_TIPO[dto.tipoAtividade]
@@ -101,7 +131,7 @@ ${dto.contextoAdicional ? `- **Contexto Adicional:** ${dto.contextoAdicional}` :
 }`;
 
     try {
-      const resposta = await this.openai.chat.completions.create({
+      const resposta = await openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
         messages: [
           {
@@ -156,6 +186,8 @@ ${dto.contextoAdicional ? `- **Contexto Adicional:** ${dto.contextoAdicional}` :
     observacoes: string;
     campoDeExperiencia: string;
   }): Promise<{ microgestos: string[]; justificativa: string }> {
+    const openai = this.getOpenAI();
+
     const prompt = `Você é uma especialista em Educação Infantil e desenvolvimento infantil.
 
 Com base nas observações abaixo sobre uma criança, sugira 3 a 5 MICROGESTOS PEDAGÓGICOS que o professor pode fazer para apoiar o desenvolvimento desta criança.
@@ -178,7 +210,7 @@ Responda em JSON:
 }`;
 
     try {
-      const resposta = await this.openai.chat.completions.create({
+      const resposta = await openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
         messages: [
           {
@@ -200,6 +232,7 @@ Responda em JSON:
       return JSON.parse(conteudo);
     } catch (error) {
       this.logger.error('Erro ao gerar microgestos:', error);
+      if (error instanceof ServiceUnavailableException) throw error;
       throw new ServiceUnavailableException(
         'Serviço de IA temporariamente indisponível.',
       );
@@ -216,6 +249,7 @@ Responda em JSON:
     observacoes: string[];
     periodo: string;
   }): Promise<{ relatorio: string; pontosFortess: string[]; sugestoes: string[] }> {
+    const openai = this.getOpenAI();
     const observacoesTexto = params.observacoes
       .map((o, i) => `${i + 1}. ${o}`)
       .join('\n');
@@ -238,7 +272,7 @@ Responda em JSON:
 }`;
 
     try {
-      const resposta = await this.openai.chat.completions.create({
+      const resposta = await openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
         messages: [
           {
@@ -260,6 +294,7 @@ Responda em JSON:
       return JSON.parse(conteudo);
     } catch (error) {
       this.logger.error('Erro ao gerar relatório:', error);
+      if (error instanceof ServiceUnavailableException) throw error;
       throw new ServiceUnavailableException(
         'Serviço de IA temporariamente indisponível.',
       );
