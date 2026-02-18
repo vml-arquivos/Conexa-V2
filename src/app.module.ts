@@ -20,12 +20,14 @@ import { ReportsModule } from './reports/reports.module';
 import { MaterialRequestModule } from './material-request/material-request.module';
 import { LookupModule } from './lookup/lookup.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
-
 import { AdminModule } from './admin/admin.module';
+import { PedidoCompraModule } from './pedido-compra/pedido-compra.module';
 
 @Module({
   imports: [
-    AdminModule, EventEmitterModule.forRoot({ global: true }), ConfigModule.forRoot({
+    AdminModule,
+    EventEmitterModule.forRoot({ global: true }),
+    ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
     }),
@@ -44,13 +46,14 @@ import { AdminModule } from './admin/admin.module';
     MetricsModule,
     MaterialRequestModule,
     LookupModule,
+    PedidoCompraModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
     {
       provide: APP_GUARD,
-      useClass: JwtAuthGuard, // Aplicar JwtAuthGuard globalmente
+      useClass: JwtAuthGuard,
     },
   ],
 })
