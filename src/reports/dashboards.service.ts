@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RoleLevel, AuditLogAction, Prisma } from '@prisma/client';
+import { canAccessUnit } from '../common/utils/can-access-unit';
 
 @Injectable()
 export class DashboardsService {
@@ -112,34 +113,25 @@ export class DashboardsService {
         );
       }
 
-      // Validação de acesso multi-tenant
-      if (!user.roles.some((role) => role.level === RoleLevel.DEVELOPER)) {
-        const unit = await this.prisma.unit.findUnique({
-          where: { id: targetUnitId },
-          select: { mantenedoraId: true },
-        });
+      // Validação de acesso multi-tenant usando helper unificado
+      if (!canAccessUnit(user, targetUnitId)) {
+        throw new ForbiddenException('Sem acesso à unidade informada');
+      }
 
-        if (!unit) {
-          throw new BadRequestException('Unidade não encontrada');
-        }
+      // Validar que a unidade existe e pertence à mesma mantenedora
+      const unit = await this.prisma.unit.findUnique({
+        where: { id: targetUnitId },
+        select: { mantenedoraId: true },
+      });
 
-        // MANTENEDORA: verificar mesma mantenedora
-        if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
-          if (unit.mantenedoraId !== user.mantenedoraId) {
-            throw new ForbiddenException('Sem acesso à unidade informada');
-          }
-        }
-        // UNIDADE/STAFF_CENTRAL: verificar própria unitId
-        else if (
-          user.roles.some(
-            (role) =>
-              role.level === RoleLevel.UNIDADE ||
-              role.level === RoleLevel.STAFF_CENTRAL,
-          )
-        ) {
-          if (targetUnitId !== user.unitId) {
-            throw new ForbiddenException('Sem acesso à unidade informada');
-          }
+      if (!unit) {
+        throw new BadRequestException('Unidade não encontrada');
+      }
+
+      // MANTENEDORA: verificar mesma mantenedora
+      if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
+        if (unit.mantenedoraId !== user.mantenedoraId) {
+          throw new ForbiddenException('Sem acesso à unidade informada');
         }
       }
 
@@ -259,6 +251,7 @@ export class DashboardsService {
     user: JwtPayload,
     date?: string,
     classroomId?: string,
+    unitId?: string,
   ) {
     try {
       // Data padrão: hoje
@@ -379,9 +372,81 @@ export class DashboardsService {
         };
       }
 
-      // Roles globais sem classroomId: erro
+      // STAFF_CENTRAL/UNIDADE_*: sem classroomId, retornar agregado por unidade
+      if (
+        user.roles.some(
+          (role) =>
+            role.level === RoleLevel.STAFF_CENTRAL ||
+            role.level === RoleLevel.UNIDADE,
+        )
+      ) {
+        // Determinar unitId alvo
+        const targetUnitId = unitId || user.unitId;
+
+        if (!targetUnitId) {
+          throw new BadRequestException(
+            'unitId é obrigatório para STAFF_CENTRAL/UNIDADE sem classroomId',
+          );
+        }
+
+        // Validar acesso à unidade
+        if (!canAccessUnit(user, targetUnitId)) {
+          throw new ForbiddenException('Sem acesso à unidade informada');
+        }
+
+        // Buscar todas as turmas ativas da unidade
+        const classrooms = await this.prisma.classroom.findMany({
+          where: {
+            unitId: targetUnitId,
+            isActive: true,
+          },
+          select: {
+            id: true,
+            name: true,
+            unitId: true,
+          },
+          orderBy: { name: 'asc' },
+        });
+
+        // Calcular KPIs para cada turma
+        const classroomsData = await Promise.all(
+          classrooms.map(async (classroom) => {
+            const kpis = await this.getClassroomKPIs(
+              classroom.id,
+              targetDate,
+              endOfDay,
+            );
+
+            return {
+              classroomId: classroom.id,
+              classroomName: classroom.name,
+              ...kpis,
+            };
+          }),
+        );
+
+        // Auditoria VIEW (best-effort)
+        if (classrooms.length > 0) {
+          await this.audit.log({
+            action: AuditLogAction.VIEW,
+            entity: 'UNIT',
+            entityId: targetUnitId,
+            userId: user.sub,
+            mantenedoraId: user.mantenedoraId || '',
+            unitId: targetUnitId,
+            description: `Dashboard agregado visualizado (${classrooms.length} turmas)`,
+          });
+        }
+
+        return {
+          date: targetDate.toISOString().split('T')[0],
+          classrooms: classroomsData,
+        };
+      }
+
+      // Outros roles sem classroomId: erro
       throw new BadRequestException(
-        'classroomId é obrigatório para roles não-professor',
+        'classroomId ou unitId é obrigatório',
       );
     } catch (error) {
       if (

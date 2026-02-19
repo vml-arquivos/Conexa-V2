@@ -1,0 +1,5 @@
+{
+  "message": "classroomId é obrigatório para roles não-professor",
+  "error": "Bad Request",
+  "statusCode": 400
+}

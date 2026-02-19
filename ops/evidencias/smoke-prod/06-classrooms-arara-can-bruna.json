@@ -1,0 +1,38 @@
+[
+  {
+    "id": "cmlpwjw3s00016mepuvo4s44e",
+    "code": "BERCARIO-I",
+    "name": "Berçário I",
+    "unitId": "cmllrftli000113ve5h9r1aex"
+  },
+  {
+    "id": "cmlpwjw4600036meppmpvjxbt",
+    "code": "BERCARIO-II",
+    "name": "Berçário II",
+    "unitId": "cmllrftli000113ve5h9r1aex"
+  },
+  {
+    "id": "cmlpwjw4g00056mepk03g9tkl",
+    "code": "MATERNAL-I",
+    "name": "Maternal I",
+    "unitId": "cmllrftli000113ve5h9r1aex"
+  },
+  {
+    "id": "cmlpwjw4q00076mepmup32tb2",
+    "code": "MATERNAL-II",
+    "name": "Maternal II",
+    "unitId": "cmllrftli000113ve5h9r1aex"
+  },
+  {
+    "id": "cmlpwjw4z00096mepx8jbsyec",
+    "code": "PRE-I",
+    "name": "Pré-escola I",
+    "unitId": "cmllrftli000113ve5h9r1aex"
+  },
+  {
+    "id": "cmlpwjw56000b6mepfvogyzf2",
+    "code": "PRE-II",
+    "name": "Pré-escola II",
+    "unitId": "cmllrftli000113ve5h9r1aex"
+  }
+]
