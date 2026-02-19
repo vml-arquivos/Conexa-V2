@@ -137,6 +137,7 @@ describe('DashboardsController', () => {
       const result = await controller.getTeacherDashboard(
         '2026-02-10',
         'classroom-1',
+        undefined,
         mockUser,
       );
 
@@ -144,6 +145,7 @@ describe('DashboardsController', () => {
         mockUser,
         '2026-02-10',
         'classroom-1',
+        undefined,
       );
       expect(result).toEqual(mockResult);
     });

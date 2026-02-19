@@ -114,7 +114,24 @@ export class DashboardsService {
       }
 
       // Validação de acesso multi-tenant usando helper unificado
-      if (!canAccessUnit(user, targetUnitId)) {
+      if (
+        !(await canAccessUnit(user, targetUnitId, async ({ userId }) => {
+          const scopes = await this.prisma.userRoleUnitScope.findMany({
+            where: {
+              userRole: {
+                userId,
+                isActive: true,
+                role: {
+                  level: RoleLevel.STAFF_CENTRAL,
+                },
+              },
+            },
+            select: { unitId: true },
+          });
+
+          return scopes.map((scope) => scope.unitId);
+        }))
+      ) {
         throw new ForbiddenException('Sem acesso à unidade informada');
       }
 
@@ -390,7 +407,24 @@ export class DashboardsService {
         }
 
         // Validar acesso à unidade
-        if (!canAccessUnit(user, targetUnitId)) {
+        if (
+          !(await canAccessUnit(user, targetUnitId, async ({ userId }) => {
+            const scopes = await this.prisma.userRoleUnitScope.findMany({
+              where: {
+                userRole: {
+                  userId,
+                  isActive: true,
+                  role: {
+                    level: RoleLevel.STAFF_CENTRAL,
+                  },
+                },
+              },
+              select: { unitId: true },
+            });
+
+            return scopes.map((scope) => scope.unitId);
+          }))
+        ) {
           throw new ForbiddenException('Sem acesso à unidade informada');
         }
 
