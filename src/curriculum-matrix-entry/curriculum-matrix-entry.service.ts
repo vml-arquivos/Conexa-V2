@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MatrixCacheInvalidationService } from '../cache/matrix-cache-invalidation.service';
 import { AuditService } from '../common/services/audit.service';
 import { CreateCurriculumMatrixEntryDto } from './dto/create-curriculum-matrix-entry.dto';
 import { UpdateCurriculumMatrixEntryDto } from './dto/update-curriculum-matrix-entry.dto';
@@ -16,7 +17,11 @@ export class CurriculumMatrixEntryService {
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
-  ) {}
+  
+    private readonly matrixCacheInvalidation: MatrixCacheInvalidationService,
+  
+) {}
+
 
   /**
    * Criar uma nova entrada na Matriz Curricular
@@ -86,6 +91,8 @@ export class CurriculumMatrixEntryService {
         campoDeExperiencia: entry.campoDeExperiencia,
       },
     });
+
+    await this.matrixCacheInvalidation.bump(user.mantenedoraId);
 
     return entry;
   }
@@ -250,6 +257,8 @@ export class CurriculumMatrixEntryService {
       changes: { before: entry, after: updated },
     });
 
+    await this.matrixCacheInvalidation.bump(user.mantenedoraId);
+
     return updated;
   }
 
@@ -288,6 +297,8 @@ export class CurriculumMatrixEntryService {
       mantenedoraId: user.mantenedoraId,
       changes: { entry },
     });
+
+    await this.matrixCacheInvalidation.bump(user.mantenedoraId);
 
     return { message: 'Entrada da matriz deletada com sucesso' };
   }

@@ -8,7 +8,11 @@ import {
   Delete,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { CacheTTL } from '@nestjs/cache-manager';
+import { TenantCacheInterceptor } from '../cache/tenant-cache.interceptor';
+import { MatrixCacheInterceptor } from '../cache/matrix-cache.interceptor';
 import { CurriculumMatrixEntryService } from './curriculum-matrix-entry.service';
 import { CreateCurriculumMatrixEntryDto } from './dto/create-curriculum-matrix-entry.dto';
 import { UpdateCurriculumMatrixEntryDto } from './dto/update-curriculum-matrix-entry.dto';
@@ -37,6 +41,8 @@ export class CurriculumMatrixEntryController {
   }
 
   @Get()
+  @CacheTTL(86400) // 24h para matriz curricular (read-heavy, muda raramente)
+  @UseInterceptors(MatrixCacheInterceptor)
   findAll(@Query() query: QueryCurriculumMatrixEntryDto, @CurrentUser() user: JwtPayload) {
     return this.curriculumMatrixEntryService.findAll(query, user);
   }

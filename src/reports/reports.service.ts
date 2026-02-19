@@ -6,10 +6,40 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RoleLevel } from '@prisma/client';
+import { canAccessUnit } from '../common/utils/can-access-unit';
 
 @Injectable()
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async getStaffCentralUnitScopes(userId: string): Promise<string[]> {
+    const scopes = await this.prisma.userRoleUnitScope.findMany({
+      where: {
+        userRole: {
+          userId,
+          isActive: true,
+          role: {
+            level: RoleLevel.STAFF_CENTRAL,
+          },
+        },
+      },
+      select: { unitId: true },
+    });
+
+    return scopes.map((scope) => scope.unitId);
+  }
+
+  private getFullName(person?: {
+    firstName?: string | null;
+    lastName?: string | null;
+    name?: string | null;
+  } | null): string {
+    if (!person) return '—';
+
+    if (person.name?.trim()) return person.name.trim();
+
+    return `${person.firstName || ''} ${person.lastName || ''}`.trim() || '—';
+  }
 
   /**
    * Relatório de diário por turma
@@ -34,6 +64,7 @@ export class ReportsService {
           select: {
             id: true,
             mantenedoraId: true,
+            name: true,
           },
         },
       },
@@ -60,6 +91,16 @@ export class ReportsService {
       }
     }
 
+    const hasAccessToUnit = await canAccessUnit(
+      user,
+      classroom.unit.id,
+      async ({ userId }) => this.getStaffCentralUnitScopes(userId),
+    );
+
+    if (!hasAccessToUnit) {
+      throw new ForbiddenException('Sem acesso à unidade informada');
+    }
+
     // Buscar eventos
     const events = await this.prisma.diaryEvent.findMany({
       where: {
@@ -71,6 +112,25 @@ export class ReportsService {
       },
       include: {
         child: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        unit: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        classroom: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        createdByUser: {
           select: {
             id: true,
             firstName: true,
@@ -99,12 +159,23 @@ export class ReportsService {
       },
     });
 
+    const enrichedEvents = events.map((event) => ({
+      ...event,
+      unitName: event.unit.name,
+      classroomName: event.classroom.name,
+      childName: this.getFullName(event.child),
+      teacherName: this.getFullName(event.createdByUser),
+    }));
+
     return {
       classroomId,
+      classroomName: classroom.name,
+      unitId: classroom.unit.id,
+      unitName: classroom.unit.name,
       startDate,
       endDate,
-      totalEvents: events.length,
-      events,
+      totalEvents: enrichedEvents.length,
+      events: enrichedEvents,
     };
   }
 
@@ -134,11 +205,14 @@ export class ReportsService {
       if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
         where.mantenedoraId = user.mantenedoraId;
       }
-      // Staff Central: filtrar por unitId
+      // Staff Central: filtrar por unitScopes
       else if (
         user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL)
       ) {
-        where.unitId = user.unitId;
+        const unitScopes = await this.getStaffCentralUnitScopes(user.sub);
+        where.unitId = {
+          in: unitScopes.length > 0 ? unitScopes : ['__sem_escopo__'],
+        };
       }
       // Unidade: filtrar por unitId
       else if (user.roles.some((role) => role.level === RoleLevel.UNIDADE)) {
@@ -155,7 +229,20 @@ export class ReportsService {
             name: true,
           },
         },
+        unit: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         child: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        createdByUser: {
           select: {
             id: true,
             firstName: true,
@@ -174,11 +261,19 @@ export class ReportsService {
       },
     });
 
+    const enrichedEvents = events.map((event) => ({
+      ...event,
+      unitName: event.unit.name,
+      classroomName: event.classroom.name,
+      childName: this.getFullName(event.child),
+      teacherName: this.getFullName(event.createdByUser),
+    }));
+
     return {
       startDate,
       endDate,
-      totalEvents: events.length,
-      events,
+      totalEvents: enrichedEvents.length,
+      events: enrichedEvents,
     };
   }
 
@@ -204,11 +299,14 @@ export class ReportsService {
       if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
         where.mantenedoraId = user.mantenedoraId;
       }
-      // Staff Central: filtrar por unitId
+      // Staff Central: filtrar por unitScopes
       else if (
         user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL)
       ) {
-        where.unitId = user.unitId;
+        const unitScopes = await this.getStaffCentralUnitScopes(user.sub);
+        where.unitId = {
+          in: unitScopes.length > 0 ? unitScopes : ['__sem_escopo__'],
+        };
       }
       // Unidade: filtrar por unitId
       else if (user.roles.some((role) => role.level === RoleLevel.UNIDADE)) {
@@ -225,7 +323,20 @@ export class ReportsService {
             name: true,
           },
         },
+        unit: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         child: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        createdByUser: {
           select: {
             id: true,
             firstName: true,
@@ -238,9 +349,19 @@ export class ReportsService {
       },
     });
 
+    const enrichedEvents = events.map((event) => ({
+      ...event,
+      unitName: event.unit.name,
+      classroomName: event.classroom.name,
+      childName: this.getFullName(event.child),
+      teacherName: this.getFullName(event.createdByUser),
+    }));
+
     return {
-      totalUnplanned: events.length,
-      events,
+      totalUnplanned: enrichedEvents.length,
+      events: enrichedEvents,
     };
   }
+
+
 }

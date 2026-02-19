@@ -65,4 +65,6 @@ export class ReportsController {
   getUnplannedDiaryEvents(@CurrentUser() user: JwtPayload) {
     return this.reportsService.getUnplannedDiaryEvents(user);
   }
+
+
 }

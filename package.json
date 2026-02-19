@@ -4,7 +4,7 @@
   "description": "_Gerado por MANUZ, IA Engenheira de Software Sênior._",
   "main": "index.js",
   "scripts": {
-    "build": "nest build",
+    "build": "nest build && node scripts/copy-data-to-dist.js",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
@@ -15,7 +15,12 @@
     "db:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
     "snapshot:manifest": "bash scripts/snapshot-manifest.sh",
-    "test": "jest --runInBand"
+    "test": "jest",
+    "seed:matriz-2026": "node dist/src/scripts/seed-matriz-2026.js",
+    "seed:ensure-cocris-units": "node dist/src/scripts/ensure-cocris-units.js",
+    "seed:import-arara-2026": "node dist/src/scripts/import-arara-2026.js",
+    "seed:create-urgent-logins": "node dist/src/scripts/create-urgent-logins.js",
+    "seed:arara-demo-data": "node dist/src/scripts/seed-arara-demo-data.js"
   },
   "repository": {
     "type": "git",
@@ -53,20 +58,27 @@
     "@nestjs/common": "^11.1.13",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.13",
+    "@nestjs/event-emitter": "^3.0.1",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/mapped-types": "^2.1.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.13",
     "@prisma/client": "^5.22.0",
+    "@types/multer": "^2.0.0",
     "bcrypt": "^6.0.0",
-    "cache-manager": "^7.2.8",
+    "cache-manager-redis-yet": "^5.1.5",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
+    "csv-parser": "^3.2.0",
+    "date-fns": "^4.1.0",
+    "multer": "^2.0.2",
     "node-fetch": "^2.7.0",
+    "openai": "^6.22.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pdf-parse": "^2.4.5",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "xlsx": "^0.18.5"
   }
 }

@@ -1,0 +1,101 @@
+{
+  "staff_central": {
+    "bruna.vaz@cocris.org": {
+      "firstName": "Bruna",
+      "lastName": "Vaz",
+      "funcao": "Coordenadora Geral Pedagógica",
+      "acesso": "Todas as 7 unidades"
+    },
+    "carla.psicologa@cocris.org": {
+      "firstName": "Carla",
+      "lastName": "",
+      "funcao": "Psicóloga",
+      "acesso": "Todas as 7 unidades",
+      "observacao": "Sobrenome não informado"
+    }
+  },
+  "gestao_arara_can": {
+    "diretor.arara@cocris.org": {
+      "firstName": "Daniel",
+      "lastName": "",
+      "funcao": "Diretor",
+      "unidade": "CEPI Arara Canindé"
+    },
+    "ana.carolina@cocris.org": {
+      "firstName": "Ana Carolina",
+      "lastName": "de Araujo",
+      "funcao": "Coordenadora Pedagógica",
+      "unidade": "CEPI Arara Canindé"
+    },
+    "secretaria.arara@cocris.org": {
+      "firstName": "Adriel",
+      "lastName": "",
+      "funcao": "Secretário",
+      "unidade": "CEPI Arara Canindé"
+    },
+    "nutricionista.arara@cocris.org": {
+      "firstName": "Dorli",
+      "lastName": "",
+      "funcao": "Nutricionista",
+      "unidade": "CEPI Arara Canindé"
+    }
+  },
+  "professoras_arara_can": {
+    "BERCARIO_I": {
+      "turma": "Berçário I",
+      "professora": "RAQUEL",
+      "email_atual": "maria.silva@cocris.edu.br"
+    },
+    "BERCARIO_II_A": {
+      "turma": "Berçário II A",
+      "professora": "ELISANGELA",
+      "email_atual": "ana.santos@cocris.edu.br",
+      "observacao": "Berçário II tem 2 turmas (A e B)"
+    },
+    "BERCARIO_II_B": {
+      "turma": "Berçário II B",
+      "professora": "JESSICA",
+      "email_atual": null,
+      "observacao": "Não há email cadastrado para esta turma"
+    },
+    "MATERNAL_I_A": {
+      "turma": "Maternal I A",
+      "professora": "LUCIENE",
+      "email_atual": "joana.oliveira@cocris.edu.br",
+      "observacao": "Maternal I tem 3 turmas (A, B, C)"
+    },
+    "MATERNAL_I_B": {
+      "turma": "Maternal I B",
+      "professora": "ANA",
+      "email_atual": null
+    },
+    "MATERNAL_I_C": {
+      "turma": "Maternal I C",
+      "professora": "EDILVANA",
+      "email_atual": null
+    },
+    "MATERNAL_II_A": {
+      "turma": "Maternal II A",
+      "professora": "RAQUEL",
+      "email_atual": "carla.souza@cocris.edu.br",
+      "observacao": "Maternal II tem 3 turmas (A, B, C)"
+    },
+    "MATERNAL_II_B": {
+      "turma": "Maternal II B",
+      "professora": "ANGELICA",
+      "email_atual": null
+    },
+    "MATERNAL_II_C": {
+      "turma": "Maternal II C",
+      "professora": "LUCIENE",
+      "email_atual": null
+    }
+  },
+  "observacoes": {
+    "total_professoras": 7,
+    "total_turmas": 9,
+    "emails_existentes": 4,
+    "emails_faltantes": 5,
+    "pre_escola": "Não há dados de Pré-escola I e II no arquivo"
+  }
+}

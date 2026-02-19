@@ -1,0 +1,66 @@
+{
+  "metadata": {
+    "title": "Matriz Curricular 2026 - COCRIS",
+    "organization": "Associação Beneficente Coração De Cristo",
+    "year": 2026,
+    "version": 1,
+    "description": "Amostra representativa da Matriz Curricular 2026 - Primeira semana de fevereiro"
+  },
+  "entries": [
+    {
+      "date": "2026-02-09",
+      "weekOfYear": 6,
+      "bimester": 1,
+      "campoDeExperiencia": "O_EU_O_OUTRO_E_O_NOS",
+      "objetivoBNCC": "Estabelecer vínculos afetivos com adultos e outras crianças, sentindo-se protegido e seguro no ambiente educativo.",
+      "objetivoBNCCCode": "EI01EO03",
+      "objetivoCurriculo": "Perceber o ambiente de educação coletiva como um local afetivo e protetor, que lhe transmite segurança e acolhimento.",
+      "intencionalidade": "Favorecer a adaptação inicial dos bebês, promovendo vínculo, segurança emocional e sentimento de pertencimento ao espaço escolar.",
+      "exemploAtividade": "Acolhimento no tapete com músicas suaves, colo e exploração livre da sala com presença constante do adulto de referência."
+    },
+    {
+      "date": "2026-02-10",
+      "weekOfYear": 6,
+      "bimester": 1,
+      "campoDeExperiencia": "CORPO_GESTOS_E_MOVIMENTOS",
+      "objetivoBNCC": "Movimentar as partes do corpo para exprimir corporalmente emoções, necessidades e desejos.",
+      "objetivoBNCCCode": "EI01CG01",
+      "objetivoCurriculo": "Movimentar as partes do corpo para exprimir corporalmente emoções, necessidades e desejos.",
+      "intencionalidade": "Estimular a expressão corporal como forma primordial de comunicação dos bebês.",
+      "exemploAtividade": "Brincadeiras corporais com músicas, espelho e gestos, valorizando movimentos espontâneos e expressões faciais."
+    },
+    {
+      "date": "2026-02-11",
+      "weekOfYear": 6,
+      "bimester": 1,
+      "campoDeExperiencia": "TRACOS_SONS_CORES_E_FORMAS",
+      "objetivoBNCC": "Manipular materiais diversos e variados para explorar cores, formas, texturas e sons.",
+      "objetivoBNCCCode": "EI01TS02",
+      "objetivoCurriculo": "Manusear objetos e brinquedos coloridos.",
+      "intencionalidade": "Ampliar a percepção visual e o interesse pelas cores por meio da exploração ativa de objetos.",
+      "exemploAtividade": "Cesto de brinquedos coloridos para exploração livre no chão, com nomeação das cores pelo adulto."
+    },
+    {
+      "date": "2026-02-12",
+      "weekOfYear": 6,
+      "bimester": 1,
+      "campoDeExperiencia": "ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO",
+      "objetivoBNCC": "Reconhecer quando é chamado por seu nome e reconhecer os nomes das pessoas com quem convive.",
+      "objetivoBNCCCode": "EI01EF04",
+      "objetivoCurriculo": "Reconhecer quando é chamado por seu nome e reconhecer os nomes das pessoas com quem convive.",
+      "intencionalidade": "Fortalecer a identidade do bebê e o vínculo com os adultos e pares por meio do reconhecimento do nome.",
+      "exemploAtividade": "Roda de acolhimento com músicas e chamadas nominais, utilizando fotos das crianças e da equipe."
+    },
+    {
+      "date": "2026-02-13",
+      "weekOfYear": 6,
+      "bimester": 1,
+      "campoDeExperiencia": "ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES",
+      "objetivoBNCC": "Explorar o ambiente pela ação e observação, manipulando, experimentando e fazendo descobertas.",
+      "objetivoBNCCCode": "EI01ET01",
+      "objetivoCurriculo": "Explorar o ambiente pela ação e observação, manipulando, experimentando e fazendo descobertas.",
+      "intencionalidade": "Incentivar a curiosidade e a exploração ativa dos espaços e objetos do cotidiano escolar.",
+      "exemploAtividade": "Exploração orientada da sala e do pátio com objetos dispostos para manipulação e observação livre."
+    }
+  ]
+}

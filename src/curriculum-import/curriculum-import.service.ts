@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MatrixCacheInvalidationService } from '../cache/matrix-cache-invalidation.service';
 import { AuditService } from '../common/services/audit.service';
 import { CurriculumPdfParserService, ParsedMatrixEntry } from './curriculum-pdf-parser.service';
 import { ImportCurriculumDto, ImportMatrixDto, ImportMode } from './dto/import-curriculum.dto';
@@ -27,7 +28,11 @@ export class CurriculumImportService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly pdfParser: CurriculumPdfParserService,
-  ) {}
+  
+    private readonly matrixCacheInvalidation: MatrixCacheInvalidationService,
+  
+) {}
+
 
   /**
    * Importação em modo dry-run (simulação)
@@ -108,6 +113,8 @@ export class CurriculumImportService {
         force: dto.force,
       },
     });
+
+    await this.matrixCacheInvalidation.bump(matrix.mantenedoraId);
 
     return {
       mode: ImportMode.APPLY,
