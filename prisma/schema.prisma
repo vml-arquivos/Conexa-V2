@@ -264,6 +264,15 @@ model Mantenedora {
   auditLogs            AuditLog[]
   pedidosCompra        PedidoCompra[]
   solicitacoesCorrecao SolicitacaoCorrecao[]
+  arquivos             Arquivo[]
+  coordenacoesReuniao  CoordenacaoReuniao[]
+  formacoes            Formacao[]
+  atendimentosPais     AtendimentoPais[]
+  relatoriosFoto       RelatorioFoto[]
+  rdixTemplates        RDIXTemplate[]
+  rdixInstancias       RDIXInstancia[]
+  alertasOperacionais  AlertaOperacional[]
+  templatesOffline     TemplateOffline[]
 
   @@index([cnpj])
   @@index([isActive])
@@ -531,6 +540,8 @@ model Child {
   dietaryRestrictions DietaryRestriction[]
   reportBases         ReportBase[]
   aiContexts          AIContext[]
+  atendimentosPais    AtendimentoPais[]
+  rdixInstancias      RDIXInstancia[]
 
   @@index([mantenedoraId])
   @@index([unitId])
@@ -1302,4 +1313,365 @@ model SolicitacaoCorrecao {
   @@index([responsavelId])
   @@index([status])
   @@index([tipoAlvo, alvoId])
+}
+
+// ============================================================================
+// 16. ARQUIVO (anexos universais — doc/pdf/xls/jpg/png)
+// ============================================================================
+enum ArquivoEntidade {
+  COORDENACAO_REUNIAO
+  COORDENACAO_ATA
+  FORMACAO
+  ATENDIMENTO_PAIS
+  RELATORIO_FOTO
+  DIARIO
+  PLANEJAMENTO
+  RDIX_INSTANCIA
+  OUTRO
+}
+
+model Arquivo {
+  id             String          @id @default(cuid())
+  mantenedoraId  String
+  unitId         String?
+  entidade       ArquivoEntidade
+  entidadeId     String          @db.VarChar(255)
+  nomeOriginal   String          @db.VarChar(255)
+  nomeArquivo    String          @db.VarChar(255)
+  mimeType       String          @db.VarChar(100)
+  tamanhoBytes   Int
+  caminho        String          @db.VarChar(500)
+  uploadadoPorId String          @db.VarChar(255)
+  criadoEm      DateTime        @default(now())
+  mantenedora   Mantenedora     @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  @@index([mantenedoraId])
+  @@index([entidade, entidadeId])
+  @@index([uploadadoPorId])
+}
+
+// ============================================================================
+// 17. COORDENAÇÕES (reuniões, pauta, ata, formações)
+// ============================================================================
+enum TipoCoordenacao {
+  UNIDADE
+  REDE
+  FORMACAO
+  EMERGENCIAL
+}
+
+enum StatusCoordenacao {
+  RASCUNHO
+  AGENDADA
+  REALIZADA
+  CANCELADA
+  PUBLICADA
+}
+
+model CoordenacaoReuniao {
+  id             String            @id @default(cuid())
+  mantenedoraId  String
+  unitId         String?
+  tipo           TipoCoordenacao
+  status         StatusCoordenacao @default(RASCUNHO)
+  titulo         String            @db.VarChar(255)
+  descricao      String?           @db.Text
+  dataRealizacao DateTime
+  localOuLink    String?           @db.VarChar(500)
+  criadoPorId    String            @db.VarChar(255)
+  publicadaEm   DateTime?
+  criadoEm      DateTime          @default(now())
+  atualizadoEm  DateTime          @updatedAt
+  mantenedora   Mantenedora       @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  participantes CoordenacaoParticipante[]
+  atas          CoordenacaoAta[]
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([tipo])
+  @@index([status])
+  @@index([dataRealizacao])
+}
+
+model CoordenacaoParticipante {
+  id          String   @id @default(cuid())
+  reuniaoId   String
+  usuarioId   String   @db.VarChar(255)
+  nomeExterno String?  @db.VarChar(255)
+  presente    Boolean  @default(false)
+  criadoEm   DateTime @default(now())
+  reuniao    CoordenacaoReuniao @relation(fields: [reuniaoId], references: [id], onDelete: Cascade)
+  @@unique([reuniaoId, usuarioId])
+  @@index([reuniaoId])
+  @@index([usuarioId])
+}
+
+model CoordenacaoAta {
+  id                  String   @id @default(cuid())
+  reuniaoId           String
+  conteudo            String   @db.Text
+  pautaJson           Json?
+  encaminhamentosJson Json?
+  redigidoPorId       String   @db.VarChar(255)
+  aprovadaEm         DateTime?
+  criadoEm           DateTime @default(now())
+  atualizadoEm       DateTime @updatedAt
+  reuniao            CoordenacaoReuniao @relation(fields: [reuniaoId], references: [id], onDelete: Cascade)
+  @@index([reuniaoId])
+}
+
+model Formacao {
+  id            String   @id @default(cuid())
+  mantenedoraId String
+  unitId        String?
+  titulo        String   @db.VarChar(255)
+  descricao     String?  @db.Text
+  ministrante   String?  @db.VarChar(255)
+  dataInicio    DateTime
+  dataFim       DateTime?
+  cargaHoraria  Float?
+  modalidade    String   @db.VarChar(50)
+  criadoPorId   String   @db.VarChar(255)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  mantenedora  Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([dataInicio])
+}
+
+// ============================================================================
+// 18. ATENDIMENTO AOS PAIS
+// ============================================================================
+enum StatusAtendimento {
+  AGENDADO
+  REALIZADO
+  CANCELADO
+  PENDENTE_RETORNO
+}
+
+enum TipoAtendimento {
+  PRESENCIAL
+  REMOTO
+  TELEFONEMA
+  MENSAGEM
+}
+
+model AtendimentoPais {
+  id                  String            @id @default(cuid())
+  mantenedoraId       String
+  unitId              String
+  childId             String
+  responsavelNome     String            @db.VarChar(255)
+  responsavelRelacao  String?           @db.VarChar(100)
+  responsavelContato  String?           @db.VarChar(255)
+  tipo                TipoAtendimento
+  status              StatusAtendimento @default(AGENDADO)
+  dataAtendimento     DateTime
+  atendidoPorId       String            @db.VarChar(255)
+  assunto             String            @db.VarChar(500)
+  descricao           String?           @db.Text
+  encaminhamento      String?           @db.Text
+  retornoNecessario   Boolean           @default(false)
+  dataRetorno         DateTime?
+  criadoEm           DateTime           @default(now())
+  atualizadoEm       DateTime           @updatedAt
+  mantenedora        Mantenedora        @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  child              Child              @relation(fields: [childId], references: [id], onDelete: Cascade)
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([childId])
+  @@index([status])
+  @@index([dataAtendimento])
+}
+
+// ============================================================================
+// 19. RELATÓRIO DE FOTOS/EVIDÊNCIAS
+// ============================================================================
+model RelatorioFoto {
+  id            String   @id @default(cuid())
+  mantenedoraId String
+  unitId        String
+  classroomId   String
+  titulo        String   @db.VarChar(255)
+  descricao     String?  @db.Text
+  dataAtividade DateTime
+  criadoPorId   String   @db.VarChar(255)
+  publicado     Boolean  @default(false)
+  publicadoEm  DateTime?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  mantenedora  Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([classroomId])
+  @@index([dataAtividade])
+}
+
+// ============================================================================
+// 20. RDIX / RDIC
+// ============================================================================
+enum StatusRDIX {
+  RASCUNHO
+  EM_REVISAO
+  FINALIZADO
+  PUBLICADO
+}
+
+model RDIXTemplate {
+  id            String   @id @default(cuid())
+  mantenedoraId String
+  segmento      String   @db.VarChar(50)
+  titulo        String   @db.VarChar(255)
+  estruturaJson Json
+  ativo         Boolean  @default(true)
+  criadoPorId   String   @db.VarChar(255)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  mantenedora  Mantenedora   @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  instancias   RDIXInstancia[]
+  @@index([mantenedoraId])
+  @@index([segmento])
+}
+
+model RDIXInstancia {
+  id             String     @id @default(cuid())
+  mantenedoraId  String
+  unitId         String
+  templateId     String
+  childId        String
+  classroomId    String
+  periodo        String     @db.VarChar(50)
+  anoLetivo      Int
+  status         StatusRDIX @default(RASCUNHO)
+  rascunhoJson   Json?
+  conteudoFinal  Json?
+  criadoPorId    String     @db.VarChar(255)
+  revisadoPorId  String?    @db.VarChar(255)
+  finalizadoEm  DateTime?
+  publicadoEm   DateTime?
+  criadoEm      DateTime   @default(now())
+  atualizadoEm  DateTime   @updatedAt
+  mantenedora   Mantenedora  @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  template      RDIXTemplate @relation(fields: [templateId], references: [id])
+  child         Child        @relation(fields: [childId], references: [id], onDelete: Cascade)
+  @@unique([childId, classroomId, periodo, anoLetivo])
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([classroomId])
+  @@index([status])
+}
+
+// ============================================================================
+// 21. ALERTA OPERACIONAL + NOTIFICAÇÃO IN-APP
+// ============================================================================
+enum TipoAlerta {
+  FALTA_CONSECUTIVA
+  AUSENCIA_REGISTRO_DIARIO
+  PLANEJAMENTO_PENDENTE
+  RELATORIO_PENDENTE
+  RDIX_PENDENTE
+  MATERIAL_PENDENTE
+  ATENDIMENTO_PENDENTE
+  INCONSISTENCIA_DADOS
+  OUTRO
+}
+
+enum SeveridadeAlerta {
+  BAIXA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+model AlertaOperacional {
+  id             String           @id @default(cuid())
+  mantenedoraId  String
+  unitId         String?
+  classroomId    String?
+  childId        String?
+  tipo           TipoAlerta
+  severidade     SeveridadeAlerta @default(MEDIA)
+  titulo         String           @db.VarChar(255)
+  descricao      String           @db.Text
+  metadados      Json?
+  resolvido      Boolean          @default(false)
+  resolvidoPorId String?          @db.VarChar(255)
+  resolvidoEm   DateTime?
+  criadoEm      DateTime          @default(now())
+  mantenedora   Mantenedora      @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  notificacoes  Notificacao[]
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([tipo])
+  @@index([severidade])
+  @@index([resolvido])
+  @@index([criadoEm])
+}
+
+model Notificacao {
+  id        String   @id @default(cuid())
+  usuarioId String   @db.VarChar(255)
+  alertaId  String?
+  titulo    String   @db.VarChar(255)
+  mensagem  String   @db.Text
+  lida      Boolean  @default(false)
+  lidaEm   DateTime?
+  link      String?  @db.VarChar(500)
+  criadoEm DateTime @default(now())
+  alerta   AlertaOperacional? @relation(fields: [alertaId], references: [id], onDelete: SetNull)
+  @@index([usuarioId])
+  @@index([lida])
+  @@index([criadoEm])
+}
+
+// ============================================================================
+// 22. TEMPLATE OFFLINE
+// ============================================================================
+model TemplateOffline {
+  id                   String   @id @default(cuid())
+  mantenedoraId        String
+  segmento             String   @db.VarChar(50)
+  semana               Int?
+  titulo               String   @db.VarChar(255)
+  campoExperiencia     String?  @db.VarChar(255)
+  objetivoBNCC         String?  @db.Text
+  objetivoCurriculo    String?  @db.Text
+  descricaoAtividade   String?  @db.Text
+  materiaisNecessarios Json?
+  duracaoMinutos       Int?
+  ativo                Boolean  @default(true)
+  criadoPorId          String   @db.VarChar(255)
+  criadoEm            DateTime @default(now())
+  atualizadoEm        DateTime @updatedAt
+  mantenedora         Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  @@index([mantenedoraId])
+  @@index([segmento])
+  @@index([semana])
+}
+
+// ============================================================================
+// 23. SYNC MUTATION (idempotência offline)
+// ============================================================================
+enum StatusSync {
+  PENDENTE
+  PROCESSADO
+  ERRO
+  IGNORADO
+}
+
+model SyncMutation {
+  id           String     @id @default(cuid())
+  clienteId    String     @db.VarChar(255)
+  usuarioId    String     @db.VarChar(255)
+  operacao     String     @db.VarChar(100)
+  entidade     String     @db.VarChar(100)
+  entidadeId   String?    @db.VarChar(255)
+  payload      Json
+  status       StatusSync @default(PENDENTE)
+  erroMsg      String?    @db.Text
+  processadoEm DateTime?
+  criadoEm    DateTime   @default(now())
+  @@unique([clienteId])
+  @@index([usuarioId])
+  @@index([status])
+  @@index([criadoEm])
 }

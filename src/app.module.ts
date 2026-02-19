@@ -23,6 +23,8 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AdminModule } from './admin/admin.module';
 import { PedidoCompraModule } from './pedido-compra/pedido-compra.module';
 import { IaAssistivaModule } from './ia-assistiva/ia-assistiva.module';
+import { ClassroomsModule } from './classrooms/classrooms.module';
+import { AtendimentoPaisModule } from './atendimento-pais/atendimento-pais.module';
 
 @Module({
   imports: [
@@ -49,6 +51,8 @@ import { IaAssistivaModule } from './ia-assistiva/ia-assistiva.module';
     LookupModule,
     PedidoCompraModule,
     IaAssistivaModule,
+    ClassroomsModule,
+    AtendimentoPaisModule,
   ],
   controllers: [AppController],
   providers: [

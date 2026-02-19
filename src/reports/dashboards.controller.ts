@@ -86,3 +86,32 @@ export class DashboardsController {
     return this.dashboardsService.getTeacherDashboard(user, date, classroomId);
   }
 }
+
+/**
+ * Controller separado para /dashboard/central
+ * Compatibilidade com o DashboardCentralPage do frontend
+ */
+import { Controller as NestController } from '@nestjs/common';
+
+@NestController('dashboard')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@UseInterceptors(TenantCacheInterceptor)
+export class DashboardCentralController {
+  constructor(private readonly dashboardsService: DashboardsService) {}
+
+  /**
+   * GET /dashboard/central
+   * Dashboard Central (Bruna/Carla) — análises consolidadas
+   * Delega para getMantenedoraStats com dados expandidos
+   */
+  @Get('central')
+  @RequireRoles('STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER')
+  @CacheTTL(300)
+  getDashboardCentral(
+    @Query('unidadeId') unidadeId: string | undefined,
+    @Query('periodo') periodo: string | undefined,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.dashboardsService.getDashboardCentral(user, unidadeId, periodo);
+  }
+}

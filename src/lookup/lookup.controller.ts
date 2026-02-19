@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards, UseInterceptors } from '@nestjs/common';
 import { LookupService } from './lookup.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -29,5 +29,29 @@ export class LookupController {
   @Get('teachers/accessible')
   async getAccessibleTeachers(@Query('unitId') unitId?: string) {
     return this.lookupService.getAccessibleTeachers(unitId);
+  }
+
+  /**
+   * GET /lookup/children/accessible?classroomId=xxx
+   * Retorna crianças matriculadas na turma (acessíveis ao usuário)
+   */
+  @Get('children/accessible')
+  async getAccessibleChildren(
+    @CurrentUser() user: JwtPayload,
+    @Query('classroomId') classroomId?: string,
+  ) {
+    return this.lookupService.getAccessibleChildren(user, classroomId);
+  }
+
+  /**
+   * GET /lookup/classrooms/:id/children
+   * Endpoint alternativo para crianças por turma
+   */
+  @Get('classrooms/:id/children')
+  async getChildrenByClassroom(
+    @Param('id') classroomId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.lookupService.getChildrenByClassroom(classroomId, user);
   }
 }
