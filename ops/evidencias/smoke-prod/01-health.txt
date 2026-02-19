@@ -1,0 +1,11 @@
+HTTP/2 200 
+access-control-allow-credentials: true
+alt-svc: h3=":443"; ma=2592000
+content-type: application/json; charset=utf-8
+date: Thu, 19 Feb 2026 03:13:26 GMT
+etag: W/"4f-+GM1605iVOoOvYBr0oVRbYkxdsk"
+vary: Origin
+x-powered-by: Express
+content-length: 79
+
+{"status":"ok","timestamp":"2026-02-19T03:13:26.151Z","uptime":15576.530381046}

@@ -81,8 +81,9 @@ export class DashboardsController {
   getTeacherDashboard(
     @Query('date') date: string | undefined,
     @Query('classroomId') classroomId: string | undefined,
+    @Query('unitId') unitId: string | undefined,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.dashboardsService.getTeacherDashboard(user, date, classroomId);
+    return this.dashboardsService.getTeacherDashboard(user, date, classroomId, unitId);
   }
 }
