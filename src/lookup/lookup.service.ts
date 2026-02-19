@@ -23,6 +23,14 @@ export interface AccessibleTeacher {
   unitId: string;
 }
 
+export interface AccessibleChild {
+  id: string;
+  firstName: string;
+  lastName: string;
+  name: string;
+  classroomId?: string;
+}
+
 @Injectable()
 export class LookupService {
   constructor(private readonly prisma: PrismaService) {}
@@ -268,5 +276,88 @@ export class LookupService {
       email: u.email,
       unitId: u.unitId || '',
     }));
+  }
+
+  /**
+   * Retorna crianças acessíveis por turma (classroomId)
+   * - PROFESSOR: apenas crianças das suas turmas
+   * - UNIDADE/STAFF_CENTRAL/MANTENEDORA/DEVELOPER: crianças da turma solicitada
+   */
+  async getAccessibleChildren(
+    user: JwtPayload,
+    classroomId?: string,
+  ): Promise<AccessibleChild[]> {
+    if (!classroomId) {
+      return [];
+    }
+
+    // Verificar se a turma existe e pertence à mantenedora do usuário
+    const classroom = await this.prisma.classroom.findFirst({
+      where: {
+        id: classroomId,
+        unit: {
+          mantenedoraId: user.mantenedoraId,
+        },
+      },
+    });
+
+    if (!classroom) {
+      throw new ForbiddenException('Turma não encontrada ou sem acesso');
+    }
+
+    // PROFESSOR: verificar se tem acesso à turma
+    const isProfessor = user.roles.some((role) => role.level === 'PROFESSOR');
+    if (isProfessor) {
+      const hasAccess = await this.prisma.classroomTeacher.findFirst({
+        where: {
+          classroomId,
+          teacherId: user.sub,
+          isActive: true,
+        },
+      });
+      if (!hasAccess) {
+        throw new ForbiddenException('Você não tem acesso a esta turma');
+      }
+    }
+
+    // Buscar crianças matriculadas na turma (via Enrollment)
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: {
+        classroomId,
+        status: 'ATIVA',
+      },
+      include: {
+        child: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+      orderBy: {
+        child: {
+          firstName: 'asc',
+        },
+      },
+    });
+
+    return enrollments.map((e) => ({
+      id: e.child.id,
+      firstName: e.child.firstName,
+      lastName: e.child.lastName,
+      name: `${e.child.firstName} ${e.child.lastName}`.trim(),
+      classroomId,
+    }));
+  }
+
+  /**
+   * Retorna crianças de uma turma específica (endpoint alternativo)
+   */
+  async getChildrenByClassroom(
+    classroomId: string,
+    user: JwtPayload,
+  ): Promise<AccessibleChild[]> {
+    return this.getAccessibleChildren(user, classroomId);
   }
 }
